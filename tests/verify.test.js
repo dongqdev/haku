@@ -124,7 +124,15 @@ test('a real `npm test` profile runs and its test count is read (covers the Wind
   }));
   sh(repo, 'add', '-A');
   sh(repo, 'commit', '-q', '-m', 'base');
-  const r = verify({ profile: 'unit', cwd: repo, base: 'main' });
+  // A nested `node --test` inherits NODE_TEST_CONTEXT and then prints no summary; run it as a fresh runner.
+  const saved = process.env.NODE_TEST_CONTEXT;
+  delete process.env.NODE_TEST_CONTEXT;
+  let r;
+  try {
+    r = verify({ profile: 'unit', cwd: repo, base: 'main' });
+  } finally {
+    if (saved !== undefined) process.env.NODE_TEST_CONTEXT = saved;
+  }
   assert.strictEqual(r.status, 'pass', JSON.stringify(r));
   assert.strictEqual(r.testCount, 2);
 });
