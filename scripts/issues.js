@@ -123,7 +123,7 @@ function main(argv) {
     case 'worker-start': {
       needIssue(opts);
       if (!opts.title || !opts.base) throw new Error('--title and --base are required');
-      out(startWorker({ cwd: opts.cwd || process.cwd(), issue: opts.issue, title: opts.title, base: opts.base }));
+      out(startWorker({ cwd: opts.cwd || process.cwd(), issue: opts.issue, title: opts.title, base: opts.base, host: host() }));
       return 0;
     }
     case 'worker-list':
@@ -136,7 +136,7 @@ function main(argv) {
         out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true }));
         return 0;
       }
-      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue) }));
+      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), deleteRemote: true }));
       return 0;
     }
     case 'pr-body':
