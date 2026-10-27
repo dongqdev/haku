@@ -113,3 +113,26 @@ test('minTests without countPattern is a config error', () => {
   const repo = makeRepo({ countPattern: undefined });
   assert.throws(() => run(repo), /countPattern/);
 });
+
+test('a real `npm test` profile runs and its test count is read (covers the Windows .cmd shim)', () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'eh-verify-npm-'));
+  sh(repo, 'init', '-q', '-b', 'main');
+  write(repo, 'package.json', JSON.stringify({ name: 'p', version: '0.0.0', scripts: { test: 'node --test tests/a.test.js' } }));
+  write(repo, 'tests/a.test.js', "const t = require('node:test'); t('one', () => {}); t('two', () => {});\n");
+  write(repo, '.ecc-harness/verify.json', JSON.stringify({
+    profiles: { unit: { cmd: ['npm', 'test'], countPattern: 'tests (\\d+)', minTests: 2 } }
+  }));
+  sh(repo, 'add', '-A');
+  sh(repo, 'commit', '-q', '-m', 'base');
+  // A nested `node --test` inherits NODE_TEST_CONTEXT and then prints no summary; run it as a fresh runner.
+  const saved = process.env.NODE_TEST_CONTEXT;
+  delete process.env.NODE_TEST_CONTEXT;
+  let r;
+  try {
+    r = verify({ profile: 'unit', cwd: repo, base: 'main' });
+  } finally {
+    if (saved !== undefined) process.env.NODE_TEST_CONTEXT = saved;
+  }
+  assert.strictEqual(r.status, 'pass', JSON.stringify(r));
+  assert.strictEqual(r.testCount, 2);
+});

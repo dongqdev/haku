@@ -75,3 +75,44 @@ test('abandon deletes without a gate (caller must have recorded why)', () => {
   removeWorker({ cwd: repo, issue: 6, gate: null, abandon: true });
   assert.ok(!fs.existsSync(w.path));
 });
+
+const fakeHost = issues => ({ listIssues: () => issues });
+const issue = (number, type, state = 'open') => ({ number, state, labels: [{ name: 'ecc-harness' }, { name: `type:${type}` }] });
+
+test('start refuses issues that are not open tasks', () => {
+  const { repo, home } = setup();
+  const host = fakeHost([issue(1, 'story'), issue(2, 'milestone'), issue(3, 'task', 'closed'), issue(4, 'task')]);
+  assert.throws(() => startWorker({ cwd: repo, issue: 1, title: 'x', base: 'main', home, host }), /not a task/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 2, title: 'x', base: 'main', home, host }), /not a task/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 3, title: 'x', base: 'main', home, host }), /not open/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 9, title: 'x', base: 'main', home, host }), /not found/);
+  assert.strictEqual(startWorker({ cwd: repo, issue: 4, title: 'ok', base: 'main', home, host }).issue, 4);
+  assert.strictEqual(listWorkers(repo).length, 1);
+});
+
+test('remove deletes the remote task branch only after a passing gate', () => {
+  const { repo, home } = setup();
+  const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'eh-worker-remote-'));
+  sh(remote, 'init', '-q', '--bare', '-b', 'main');
+  sh(repo, 'remote', 'add', 'origin', remote);
+  sh(repo, 'push', '-q', 'origin', 'main');
+  const w = startWorker({ cwd: repo, issue: 5, title: 'Push Me', base: 'main', home });
+  sh(w.path, 'push', '-q', 'origin', w.branch);
+  assert.ok(sh(repo, 'ls-remote', '--heads', 'origin', w.branch));
+  const r = removeWorker({ cwd: repo, issue: 5, gate: { ok: true }, deleteRemote: true });
+  assert.strictEqual(r.remoteBranchDeleted, true);
+  assert.strictEqual(sh(repo, 'ls-remote', '--heads', 'origin', w.branch), '');
+});
+
+test('abandon keeps the remote branch', () => {
+  const { repo, home } = setup();
+  const remote = fs.mkdtempSync(path.join(os.tmpdir(), 'eh-worker-remote-'));
+  sh(remote, 'init', '-q', '--bare', '-b', 'main');
+  sh(repo, 'remote', 'add', 'origin', remote);
+  sh(repo, 'push', '-q', 'origin', 'main');
+  const w = startWorker({ cwd: repo, issue: 6, title: 'Keep Me', base: 'main', home });
+  sh(w.path, 'push', '-q', 'origin', w.branch);
+  const r = removeWorker({ cwd: repo, issue: 6, gate: null, abandon: true, deleteRemote: true });
+  assert.strictEqual(r.remoteBranchDeleted, false);
+  assert.ok(sh(repo, 'ls-remote', '--heads', 'origin', w.branch));
+});
