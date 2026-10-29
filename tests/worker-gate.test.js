@@ -209,7 +209,11 @@ test('a rebase or merge in progress is refused even though status looks clean', 
 
 test('a worktree whose status cannot be read is kept', () => {
   const ctx = setup();
-  fs.writeFileSync(path.join(ctx.w.path, '.git'), 'gitdir: /nonexistent/place\n');
+  // Windows marks this file read-only, so it is replaced rather than overwritten.
+  const gitFile = path.join(ctx.w.path, '.git');
+  fs.chmodSync(gitFile, 0o666);
+  fs.rmSync(gitFile, { force: true });
+  fs.writeFileSync(gitFile, 'gitdir: /nonexistent/place\n');
   assert.throws(() => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }), /could not read the worktree status/);
   assert.ok(fs.existsSync(ctx.w.path));
 });
