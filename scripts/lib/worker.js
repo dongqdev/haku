@@ -37,9 +37,15 @@ function listWorkers(cwd) {
 }
 
 // With a host, the issue must exist, be open and be a task: workers never own stories or milestones.
+// The issue is read by its number, not through the list: a list can lag for seconds after an issue is created.
 function assertTaskIssue(host, issue) {
-  const found = host.listIssues().find(i => i.number === issue);
-  if (!found) throw new Error(`issue #${issue} not found among haku issues`);
+  let found;
+  try {
+    found = host.getIssue(issue);
+  } catch (err) {
+    throw new Error(`issue #${issue} not found or not readable: ${String(err.message).split('\n')[0]}`);
+  }
+  if (!found) throw new Error(`issue #${issue} not found`);
   if (issueType(found) !== 'task') throw new Error(`issue #${issue} is not a task (type: ${issueType(found) || 'none'})`);
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
 }

@@ -74,6 +74,11 @@ function dependsOn(issue) {
   return [...refs.matchAll(/(?<![\w/])#(\d+)/g)].map(x => Number(x[1]));
 }
 
+// The numbers in a parent's "## Children" checklist ("- [ ] #12 title"), as publish writes them.
+function checklistNumbers(issue) {
+  return [...stripNonClaims(issue.body).matchAll(/^\s*-\s*\[[ xX]\]\s*#(\d+)\b/gm)].map(m => Number(m[1]));
+}
+
 function parentOf(issue) {
   const m = stripNonClaims(issue.body).match(/^Parent:\s*#(\d+)\s*$/im);
   return m ? Number(m[1]) : null;
@@ -135,6 +140,7 @@ module.exports = {
   issueType,
   issueOwner,
   parentOf,
+  checklistNumbers,
   dependsOn,
   closingRefsFromText,
   issueFromBranch,

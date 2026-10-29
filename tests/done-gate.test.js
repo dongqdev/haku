@@ -8,7 +8,7 @@ const { SUMMARY_MARKER, verifiedMarker } = require('../scripts/lib/model');
 function host({ state = 'closed', prs = [], comments = [] } = {}) {
   return {
     defaultBranch: () => 'main',
-    listIssues: () => [{ number: 5, state, body: '', labels: [] }],
+    getIssue: n => { if (n !== 5) throw new Error('not found'); return { number: 5, state, body: '', labels: [] }; },
     listMergedPrs: () => prs,
     listComments: () => comments.map(body => ({ body }))
   };
@@ -38,4 +38,16 @@ test('a failed verification record does not count', () => {
 
 test('unknown issue is refused', () => {
   assert.strictEqual(doneCheck(host(), 99).ok, false);
+});
+
+test('the gate reads the issue by number, so a freshly closed issue is not seen as open from a stale list', () => {
+  const h = host({ prs: [mergedPr], comments: [summary, passed] });
+  let listed = false;
+  h.listIssues = () => { listed = true; return [{ number: 5, state: 'open' }]; };
+  assert.deepStrictEqual(doneCheck(h, 5).missing, []);
+  assert.strictEqual(listed, false);
+});
+
+test('an issue that cannot be read is reported as not found, never as a pass', () => {
+  assert.deepStrictEqual(doneCheck(host({ prs: [mergedPr], comments: [summary, passed] }), 77).missing, ['issue-not-found']);
 });

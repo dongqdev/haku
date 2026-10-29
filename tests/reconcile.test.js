@@ -127,3 +127,37 @@ test('default branch other than main is respected', () => {
   const host = fakeHost({ issues: [], prs: [], base: 'master' });
   assert.strictEqual(reconcile(host).base, 'master');
 });
+
+// ---- a parent is not rolled up while a child it names is missing from the list
+const { checklistNumbers } = require('../scripts/lib/model');
+
+test('the Children checklist of a parent is read as issue numbers', () => {
+  assert.deepStrictEqual(checklistNumbers({ body: '## Children\n- [ ] #4 First\n- [x] #5 Second\n  - [X] #6 Nested\nnot a child #9\n' }), [4, 5, 6]);
+  assert.deepStrictEqual(checklistNumbers({ body: '```\n- [ ] #8 in a fence\n```\n' }), []);
+  assert.deepStrictEqual(checklistNumbers({ body: '' }), []);
+});
+
+test('a milestone is not rolled up when its checklist names a child the list does not show yet', () => {
+  const issue = (number, type, state, body = '') => ({ number, state, body, title: `t${number}`, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
+  const issues = [
+    issue(1, 'story', 'open', '## Children\n- [ ] #2 M'),
+    issue(2, 'milestone', 'open', '## Children\n- [ ] #3 done\n- [ ] #4 created a moment ago\n\nParent: #1'),
+    issue(3, 'task', 'closed', 'Parent: #2')
+    // #4 exists on GitHub but the list has not caught up
+  ];
+  const host = { defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => [], closeIssue: () => assert.fail('must not close') };
+  const r = reconcile(host, { apply: true });
+  assert.deepStrictEqual(r.plan, []);
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind === 'child-not-listed'), [{ kind: 'child-not-listed', issue: 2, children: [4] }]);
+});
+
+test('once the list shows every child named by the checklist the roll-up goes ahead', () => {
+  const issue = (number, type, state, body = '') => ({ number, state, body, title: `t${number}`, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
+  const issues = [
+    issue(2, 'milestone', 'open', '## Children\n- [ ] #3 done\n- [ ] #4 now listed'),
+    issue(3, 'task', 'closed', 'Parent: #2'),
+    issue(4, 'task', 'closed', 'Parent: #2')
+  ];
+  const host = { defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => [], closeIssue: () => {} };
+  assert.deepStrictEqual(reconcile(host, {}).plan.map(p => [p.kind, p.issue]), [['rollup', 2]]);
+});

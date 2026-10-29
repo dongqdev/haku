@@ -3,7 +3,8 @@
 const {
   issueType,
   parentOf,
-  prRefs
+  prRefs,
+  checklistNumbers
 } = require('./model');
 
 // Close what merged but stayed open. Evidence is the host's merge state of a PR
@@ -53,6 +54,8 @@ function reconcile(host, { apply = false } = {}) {
     children.get(parent).push(issue);
   }
 
+  const byNumber = new Map(issues.map(i => [i.number, i]));
+  const warnedUnseen = new Set();
   const isDone = issue => issue.state === 'closed' || planned.has(issue.number);
   let changed = true;
   while (changed) {
@@ -63,6 +66,16 @@ function reconcile(host, { apply = false } = {}) {
       if (issue.state !== 'open' || planned.has(issue.number)) continue;
       const kids = children.get(issue.number) || [];
       if (kids.length === 0 || !kids.every(isDone)) continue;
+      // The list can lag behind a child created moments ago. A child the parent's own checklist names but the
+      // list does not show may still be open, so the parent is not rolled up on this read.
+      const unseen = checklistNumbers(issue).filter(n => !byNumber.has(n));
+      if (unseen.length) {
+        if (!warnedUnseen.has(issue.number)) {
+          warnedUnseen.add(issue.number);
+          warnings.push({ kind: 'child-not-listed', issue: issue.number, children: unseen });
+        }
+        continue;
+      }
       planned.add(issue.number);
       plan.push({
         kind: 'rollup',
