@@ -2,6 +2,7 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const { spawnSync } = require('child_process');
 const { createGitHubHost } = require('./lib/github-host');
 const { reconcile, describeWarning } = require('./lib/reconcile');
@@ -11,7 +12,8 @@ const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
-const { readConfig, titlePrefixOn } = require('./lib/config');
+const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
+const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
@@ -26,7 +28,9 @@ Usage:
   issues.js summary --issue <N> --file <summary.md>
   issues.js done-check --issue <N> [--json]
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
+  issues.js worker-launch --issue <N> --orchestrator <session name> [--base <branch>] [--cwd <dir>]
   issues.js worker-list [--cwd <dir>]
+  issues.js config [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon] [--discard]
   issues.js pr-state --issue <N> [--branch <name>] [--cwd <dir>]
   issues.js status [--json] [--repo <owner/repo>]
@@ -67,6 +71,9 @@ function parse(argv) {
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
   return opts;
 }
+
+// How a worker's session is ended: stopped first (the conversation is kept), deleted once the worktree is gone.
+const SESSIONS = { stop: id => stopOnly({ id }), remove: id => removeSession({ id }) };
 
 const out = obj => process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
@@ -151,17 +158,41 @@ function main(argv) {
       out(startWorker({ cwd: opts.cwd || process.cwd(), issue: opts.issue, title: opts.title, base: opts.base, host: host() }));
       return 0;
     }
+    case 'worker-launch': {
+      needIssue(opts);
+      const cwd = opts.cwd || process.cwd();
+      const cfg = readConfig(cwd);
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      const h = host();
+      out(launchWorker({
+        host: h,
+        cwd,
+        issue: opts.issue,
+        orchestrator: opts.orchestrator,
+        repo: opts.repo || null,
+        base: opts.base || h.defaultBranch(),
+        settings: workerSettings(cfg.config),
+        pluginRoot: path.resolve(__dirname, '..')
+      }));
+      return 0;
+    }
+    case 'config': {
+      const cfg = readConfig(opts.cwd || process.cwd());
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      out({ file: cfg.file, config: cfg.config, titlePrefix: titlePrefixOn(cfg.config), worker: workerSettings(cfg.config) });
+      return 0;
+    }
     case 'worker-list':
-      out(listWorkers(opts.cwd || process.cwd()));
+      out(withSessionStates(listWorkers(opts.cwd || process.cwd())));
       return 0;
     case 'worker-rm': {
       needIssue(opts);
       const cwd = opts.cwd || process.cwd();
       if (opts.abandon) {
-        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true, discard: Boolean(opts.discard) }));
+        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true, discard: Boolean(opts.discard), sessions: SESSIONS }));
         return 0;
       }
-      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), discard: Boolean(opts.discard), deleteRemote: true }));
+      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), discard: Boolean(opts.discard), deleteRemote: true, sessions: SESSIONS }));
       return 0;
     }
     case 'pr-state': {
