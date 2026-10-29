@@ -117,7 +117,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
     prFiles(number) {
       const files = restList(`pulls/${number}/files`, '', `files of #${number}`, f => f.filename);
       if (files.length >= 3000) throw new Error(`pull request #${number} changes ${files.length} files, which reaches GitHub's limit of 3000; refusing to decide on a partial list`);
-      return files.map(f => ({ filename: f.filename, previous_filename: f.previous_filename || null, status: f.status }));
+      return files.map(f => ({ filename: f.filename, previous_filename: f.previous_filename || null, status: f.status, patch: typeof f.patch === 'string' ? f.patch : null }));
     },
 
     // Every pull request ever opened from this branch, in any state: the branch name alone is not

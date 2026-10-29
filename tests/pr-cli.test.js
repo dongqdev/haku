@@ -59,3 +59,9 @@ test('pr-config-changes needs a plain positive --pr', () => {
     assert.match(r.stderr, /--pr/);
   }
 });
+
+test('pr-config-changes refuses an --issue that is not a number', () => {
+  const r = run('pr-config-changes', '--pr', '3', '--issue', 'abc');
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /--issue/);
+});

@@ -37,7 +37,7 @@ You normally type only these two. `plan` hands a vague goal to `sniff` first and
 
 ## Check-weakening warning
 
-`issues.js pr-config-changes --pr <number> --issue <N>` lists the files of a pull request that could make its own checks easier to pass: lint, format and type settings, test runner settings, CI workflows, git hooks and `.haku/`. `build` shows the list in the merge-approval question as "검사 설정 변경", with files outside the task's `Scope` first and marked. It is a warning, never a block. A repository can add patterns in `.haku/config.json` (`"watchFiles": ["build/**"]`); the built-in patterns cannot be switched off from there.
+`issues.js pr-config-changes --pr <number> --issue <N>` lists the files of a pull request that could make its own checks easier to pass: lint, format and type settings, test runner settings, CI workflows, git hooks and `.haku/`. `build` shows the list in the merge-approval question as "검사 설정 변경", with files outside the task's `Scope` first and marked. It is a warning, never a block, but a pull request with any listed file is never merged by `auto-when-verified`: the user is asked. The Scope used is the one recorded when the worker started, so a worker cannot widen it afterwards by editing the issue. Deleted files are named as such. `package.json` is listed only when a changed line touches a test, lint or format setting. Indirect changes (a script a workflow calls, a file an ESLint config extends) are not seen: add them to `watchFiles`. A repository can add patterns in `.haku/config.json` (`"watchFiles": ["build/**"]`); the built-in patterns cannot be switched off from there.
 
 ## Releases
 

@@ -17,7 +17,8 @@ const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
-const { patternsFrom, scopeOf, configChanges, renderChanges } = require('./lib/weaken');
+const { renderChanges } = require('./lib/weaken');
+const { prConfigChanges } = require('./lib/pr-config');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
@@ -251,11 +252,8 @@ function main(argv) {
       return 0;
     case 'pr-config-changes': {
       if (opts.pr === undefined || !(Number.isInteger(opts.pr) && opts.pr > 0)) throw new Error('--pr <number> is required');
-      const h = host();
-      const cfg = readConfig(opts.cwd || process.cwd());
-      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
-      const scope = Number.isInteger(opts.issue) ? scopeOf(h.getIssue(opts.issue).body) : null;
-      const found = configChanges(h.prFiles(opts.pr), { patterns: patternsFrom(cfg.config), scope });
+      if (opts.issue !== undefined && !(Number.isInteger(opts.issue) && opts.issue > 0)) throw new Error('--issue needs an issue number');
+      const found = prConfigChanges({ host: host(), cwd: opts.cwd || process.cwd(), pr: opts.pr, issue: opts.issue, warn: m => console.error(`[haku] warning: ${m}`) });
       if (opts.json) out({ pr: opts.pr, changes: found });
       else process.stdout.write(renderChanges(found));
       // a warning, not a block: exit 0 whether or not something was found
