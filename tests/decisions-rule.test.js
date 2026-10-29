@@ -5,7 +5,8 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+// Windows checkouts use CRLF; normalize so paragraph splitting behaves the same everywhere.
+const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 
 // The same decision rule must read identically in every skill, or the sessions drift apart.
 const RULE_START = '## Decisions';
