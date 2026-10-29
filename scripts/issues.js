@@ -17,7 +17,7 @@ const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
-const { listRepoNames, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
+const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
 
@@ -260,13 +260,14 @@ function main(argv) {
     }
     case 'project-new': {
       if (!opts.name || !opts.dir) throw new Error('--name and --dir are required');
-      const plan = planProject({ name: opts.name, parentDir: path.resolve(opts.dir), owner: opts.owner || null, visibility: opts.visibility || 'private' });
+      if (!path.isAbsolute(opts.dir)) throw new Error('--dir must be an absolute path');
+      const plan = planProject({ name: opts.name, parentDir: opts.dir, owner: opts.owner || null, visibility: opts.visibility || 'private' });
       if (!opts.apply) {
         out({ dryRun: true, ...plan });
         return 0;
       }
       // The name is checked again right before the remote write; a clash found now stops everything.
-      if (listRepoNames(plan.owner).includes(plan.name.toLowerCase())) throw new Error(`a repository named ${plan.name} already exists`);
+      if (repoExists(plan.owner, plan.name)) throw new Error(`a repository named ${plan.name} already exists`);
       out(createProject(plan));
       return 0;
     }
