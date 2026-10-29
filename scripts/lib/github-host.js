@@ -5,14 +5,22 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { BASE_LABEL, ownerLabel, labelStyle } = require('./model');
-const { readAllPages, readAllCursors } = require('./paginate');
+const { readAllPages, readAllCursors, readStable } = require('./paginate');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
 // `exec(bin, args, options)` can be injected so tests need no real gh (or shell) on any OS.
 const GH_TIMEOUT_MS = 60000;
 
-function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perPage = 100 } = {}) {
+function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perPage: requestedPerPage = 100 } = {}) {
+  // GitHub answers at most 100 per page; asking for more would make a full page look like a short one.
+  const perPage = Math.max(1, Math.min(100, Number(requestedPerPage) || 100));
+  // OWNER/REPO, or HOST/OWNER/REPO for another GitHub host; `gh api` needs the pieces separately.
+  const parts = repo ? repo.split('/') : [];
+  if (repo && (parts.length < 2 || parts.length > 3 || parts.some(p => !p))) {
+    throw new Error(`repo must be OWNER/REPO or HOST/OWNER/REPO, got "${repo}"`);
+  }
+  const apiHost = parts.length === 3 ? ['--hostname', parts[0]] : [];
   const scope = repo ? ['-R', repo] : [];
 
   function gh(args, input) {
@@ -38,7 +46,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
   }
 
   // owner/name of the repository (the one given, or the one the current folder belongs to).
-  let slug = repo;
+  let slug = repo ? parts.slice(-2).join('/') : null;
   function repoSlug() {
     if (!slug) slug = JSON.parse(gh(['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
     return slug;
@@ -46,9 +54,13 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
 
   // REST list through every page. Issues and pull requests share the issues endpoint, so pull requests are
   // dropped only after all pages are read.
-  const restList = (route, params, what) => readAllPages(
-    page => JSON.parse(gh(['api', `repos/${repoSlug()}/${route}?${params}&per_page=${perPage}&page=${page}`])),
-    { perPage, what }
+  // The list is read twice and must agree (see readStable); duplicates are dropped by `key`.
+  const restList = (route, params, what, key = i => i.number) => readStable(
+    () => readAllPages(
+      page => JSON.parse(gh(['api', ...apiHost, `repos/${repoSlug()}/${route}?${params ? `${params}&` : ''}per_page=${perPage}&page=${page}`])),
+      { perPage, what }
+    ),
+    { key, what }
   );
   const issueShape = i => ({
     number: i.number,
@@ -73,12 +85,13 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
 
     // Every haku issue, open and closed, read to the last page (a cut-off list is an error, not a result).
     listIssues() {
-      return issuesOnly(restList('issues', `state=all&labels=${encodeURIComponent(BASE_LABEL)}`, 'issue list'));
+      // oldest first: an issue created while reading lands at the end instead of shifting the pages
+      return issuesOnly(restList('issues', `state=all&sort=created&direction=asc&labels=${encodeURIComponent(BASE_LABEL)}`, 'issue list'));
     },
 
     // Every open issue, labelled or not: the backlog is mostly issues nobody labelled.
     listBacklog() {
-      return issuesOnly(restList('issues', 'state=open', 'open issue list'));
+      return issuesOnly(restList('issues', 'state=open&sort=created&direction=asc', 'open issue list'));
     },
 
     // One issue by number (not through the list, which lags right after creation).
@@ -104,16 +117,17 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
     listMergedPrs(base) {
       const [owner, name] = repoSlug().split('/');
       const query = 'query($owner:String!,$name:String!,$base:String!,$first:Int!,$after:String){repository(owner:$owner,name:$name){'
-        + 'pullRequests(states:MERGED,baseRefName:$base,first:$first,after:$after,orderBy:{field:UPDATED_AT,direction:DESC}){'
+        + 'pullRequests(states:MERGED,baseRefName:$base,first:$first,after:$after,orderBy:{field:CREATED_AT,direction:ASC}){'
         + 'pageInfo{hasNextPage endCursor} nodes{number body headRefName headRefOid mergedAt '
         + 'closingIssuesReferences(first:50){pageInfo{hasNextPage} nodes{number}}}}}}';
-      const nodes = readAllCursors(after => {
-        const args = ['api', 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-f', `base=${base}`, '-F', `first=${perPage}`];
+      // created, oldest first: neither changes when a pull request is commented on or edited mid-read
+      const nodes = readStable(() => readAllCursors(after => {
+        const args = ['api', ...apiHost, 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-f', `base=${base}`, '-F', `first=${perPage}`];
         if (after) args.push('-f', `after=${after}`);
         const data = JSON.parse(gh(args));
         if (data.errors && data.errors.length) throw new Error(`merged pull request list: ${data.errors[0].message}`);
         return data.data.repository.pullRequests;
-      }, { what: 'merged pull request list' });
+      }, { what: 'merged pull request list' }), { key: pr => pr.number, what: 'merged pull request list' });
       return nodes.map(pr => {
         const refs = pr.closingIssuesReferences || { nodes: [], pageInfo: { hasNextPage: false } };
         if (refs.pageInfo && refs.pageInfo.hasNextPage) {
@@ -171,7 +185,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
     },
 
     listComments(number) {
-      return restList(`issues/${number}/comments`, 'sort=created', `comments of #${number}`).map(c => ({ body: c.body || '' }));
+      return restList(`issues/${number}/comments`, '', `comments of #${number}`, c => c.id).map(c => ({ body: c.body || '' }));
     },
 
     commentIssue(number, body) {

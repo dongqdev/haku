@@ -71,7 +71,7 @@ test('listIssues reads every page, drops pull requests only after all pages are 
   const { host, calls } = restHost(all);
   const issues = host.listIssues();
   assert.deepStrictEqual(issues.map(i => i.number), [1, 3, 4, 5]);
-  assert.strictEqual(calls.filter(c => c[0] === 'api').length, 3, 'two full pages, then a short page ends the list');
+  assert.strictEqual(calls.filter(c => c[0] === 'api').length, 6, 'three pages per read, and the list is read twice to confirm it is stable');
   assert.match(calls[0][1], /labels=haku/);
   assert.match(calls[0][1], /state=all/);
   assert.deepStrictEqual(issues[0], { number: 1, title: 't1', body: 'b1', state: 'open', labels: [{ name: 'haku' }], assignees: [{ login: 'a' }] });
@@ -84,7 +84,7 @@ test('listBacklog reads every page of open issues of any label', () => {
 });
 
 test('listComments reads every page of comments', () => {
-  const comments = [1, 2, 3, 4, 5].map(n => ({ body: `c${n}` }));
+  const comments = [1, 2, 3, 4, 5].map(n => ({ id: 1000 + n, body: `c${n}` }));
   const { host } = restHost(comments);
   assert.deepStrictEqual(host.listComments(7).map(c => c.body), ['c1', 'c2', 'c3', 'c4', 'c5']);
 });
@@ -109,7 +109,7 @@ test('listMergedPrs reads every page and keeps head commits and closing issues',
   assert.deepStrictEqual(prs.map(p => p.number), [1, 2, 3, 4, 5]);
   assert.strictEqual(prs[0].headRefOid, 'sha1');
   assert.deepStrictEqual(prs[2].closingIssues, [103]);
-  assert.strictEqual(calls.filter(c => c[0] === 'api').length, 3);
+  assert.strictEqual(calls.filter(c => c[0] === 'api').length, 6, 'three pages per read, read twice');
   assert.ok(calls.some(c => c.includes('after=1')) && calls.some(c => c.includes('after=2')));
 });
 
@@ -137,5 +137,117 @@ test('status and triage tell the model that an incompletely read list is an erro
   for (const name of ['status', 'triage']) {
     const text = fs.readFileSync(path.join(__dirname, '..', 'skills', name, 'SKILL.md'), 'utf8');
     assert.match(text, /refusing to decide on a partial list/, name);
+  }
+});
+
+// ---- a list that changes while it is being read (the reviewer's reproduction)
+const { readStable } = require('../scripts/lib/paginate');
+const { doneCheck } = require('../scripts/lib/done-gate');
+
+test('a read that saw one item twice and missed another is repeated until two reads agree', () => {
+  const reads = [
+    [{ number: 1 }, { number: 2 }, { number: 2 }],            // 2 twice, 3 missed (the list shifted mid-read)
+    [{ number: 1 }, { number: 2 }, { number: 3 }],
+    [{ number: 1 }, { number: 2 }, { number: 3 }]
+  ];
+  let i = 0;
+  const result = readStable(() => reads[i++]);
+  assert.deepStrictEqual(result.map(x => x.number), [1, 2, 3]);
+  assert.strictEqual(i, 3);
+});
+
+test('two reads that already agree are enough, and duplicates inside a read are dropped', () => {
+  let reads = 0;
+  const result = readStable(() => { reads += 1; return [{ number: 5 }, { number: 5 }, { number: 6 }]; });
+  assert.deepStrictEqual(result.map(x => x.number), [5, 6]);
+  assert.strictEqual(reads, 2);
+});
+
+test('reads that never agree fail instead of returning one of them', () => {
+  let n = 0;
+  assert.throws(() => readStable(() => [{ number: ++n }], { what: 'open issue list' }), /open issue list: the list kept changing while it was read \(4 reads\)/);
+});
+
+test('triage cannot propose an issue as the duplicate of itself after a shifted read', () => {
+  // without the stable read this list holds #51 twice, and "same title" would pair it with itself
+  const { buildTriage } = require('../scripts/lib/triage');
+  const reads = [
+    [{ number: 50, title: 'a', body: '', state: 'open', labels: [] }, { number: 51, title: 'same title', body: '', state: 'open', labels: [] }, { number: 51, title: 'same title', body: '', state: 'open', labels: [] }],
+    [{ number: 50, title: 'a', body: '', state: 'open', labels: [] }, { number: 51, title: 'same title', body: '', state: 'open', labels: [] }, { number: 52, title: 'b', body: '', state: 'open', labels: [] }],
+    [{ number: 50, title: 'a', body: '', state: 'open', labels: [] }, { number: 51, title: 'same title', body: '', state: 'open', labels: [] }, { number: 52, title: 'b', body: '', state: 'open', labels: [] }]
+  ];
+  let i = 0;
+  const t = buildTriage(readStable(() => reads[i++]));
+  assert.deepStrictEqual(t.duplicates, []);
+  assert.deepStrictEqual(t.backlog.map(b => b.number), [50, 51, 52]);
+});
+
+// ---- what is actually asked of GitHub
+function recordingHost(options = {}) {
+  const calls = [];
+  const exec = (bin, args) => {
+    calls.push(args);
+    if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'o/r' });
+    if (args.includes('graphql')) return JSON.stringify({ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] } } } });
+    return '[]';
+  };
+  return { calls, host: createGitHubHost({ repo: 'o/r', exec, ...options }) };
+}
+
+test('issue lists ask for oldest-first order and comments use the comments route', () => {
+  const { host, calls } = recordingHost();
+  host.listIssues();
+  host.listBacklog();
+  host.listComments(7);
+  const paths = calls.filter(c => c[0] === 'api').map(c => c[1]);
+  assert.ok(paths.every(p => p.startsWith('repos/o/r/')), paths.join(' '));
+  assert.match(paths[0], /^repos\/o\/r\/issues\?state=all&sort=created&direction=asc&labels=haku&per_page=100&page=1$/);
+  assert.ok(paths.some(p => /^repos\/o\/r\/issues\?state=open&sort=created&direction=asc&per_page=100&page=1$/.test(p)));
+  assert.ok(paths.some(p => /^repos\/o\/r\/issues\/7\/comments\?per_page=100&page=1$/.test(p)));
+});
+
+test('the merged pull request query asks for merged pull requests of the base branch in a stable order', () => {
+  const { host, calls } = recordingHost();
+  host.listMergedPrs('main');
+  const args = calls.find(c => c.includes('graphql'));
+  const query = args.find(a => a.startsWith('query='));
+  assert.match(query, /states:MERGED/);
+  assert.match(query, /baseRefName:\$base/);
+  assert.match(query, /orderBy:\{field:CREATED_AT,direction:ASC\}/);
+  assert.ok(args.includes('base=main'));
+  assert.ok(args.includes('first=100'));
+});
+
+test('a page size above GitHub\'s maximum is clamped so a full page is never mistaken for the last one', () => {
+  const { host, calls } = recordingHost({ perPage: 150 });
+  host.listBacklog();
+  assert.match(calls.find(c => c[0] === 'api')[1], /per_page=100&/);
+  const small = recordingHost({ perPage: 0 });
+  small.host.listBacklog();
+  assert.match(small.calls.find(c => c[0] === 'api')[1], /per_page=100&/);
+});
+
+test('HOST/OWNER/REPO is split for gh api, and a malformed repo is rejected', () => {
+  const { host, calls } = (() => { const r = recordingHost(); return { calls: r.calls, host: createGitHubHost({ repo: 'github.example.com/o/r', exec: (b, a) => { r.calls.push(a); return a.includes('graphql') ? JSON.stringify({ data: { repository: { pullRequests: { pageInfo: { hasNextPage: false }, nodes: [] } } } }) : '[]'; } }) }; })();
+  host.listBacklog();
+  host.listMergedPrs('main');
+  const apiCalls = calls.filter(c => c[0] === 'api');
+  assert.ok(apiCalls.every(c => c[1] === '--hostname' && c[2] === 'github.example.com'));
+  assert.match(apiCalls[0][3], /^repos\/o\/r\/issues/);
+  assert.ok(apiCalls.at(-1).includes('owner=o') && apiCalls.at(-1).includes('name=r'));
+  for (const bad of ['justname', 'a/b/c/d', 'a//b', '/a/b']) assert.throws(() => createGitHubHost({ repo: bad, exec: () => '[]' }), /repo must be OWNER\/REPO or HOST\/OWNER\/REPO/, bad);
+});
+
+// ---- the gate follows the newest merged pull request of an issue
+test('with several merged pull requests for one issue the newest decides, whatever order the list came in', () => {
+  const prs = [
+    { number: 40, body: 'Closes #5', headRefName: 'task/5-b', headRefOid: 'newer', closingIssues: [5] },
+    { number: 12, body: 'Closes #5', headRefName: 'task/5-a', headRefOid: 'older', closingIssues: [5] }
+  ];
+  const comments = [{ body: '<!-- haku:worker-summary -->' }, { body: '<!-- haku:verified kind=T1 status=pass sha=abc -->' }];
+  for (const order of [prs, [...prs].reverse()]) {
+    const host = { defaultBranch: () => 'main', listIssues: () => [{ number: 5, state: 'closed', labels: [] }], listMergedPrs: () => order, listComments: () => comments };
+    const r = doneCheck(host, 5);
+    assert.deepStrictEqual([r.pr, r.prHead], [40, 'newer']);
   }
 });

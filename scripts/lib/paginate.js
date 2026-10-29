@@ -38,4 +38,21 @@ function readAllCursors(fetchPage, { maxPages = MAX_PAGES, what = 'list' } = {})
   throw new Error(`${what}: still more pages after ${maxPages}; refusing to decide on a partial list`);
 }
 
-module.exports = { readAllPages, readAllCursors, MAX_PAGES };
+// Reads a list twice (or more) until two reads hold the same members, and returns it without duplicates.
+// While a list is being read, an issue created, deleted, moved or relabelled shifts the items behind it, so
+// one item can appear twice or be skipped without any error. Two reads that agree on who is in the list make
+// that unlikely; reads that never agree are an error, not a result. `key` identifies an item.
+function readStable(read, { key = x => x.number, attempts = 4, what = 'list' } = {}) {
+  const unique = items => [...new Map(items.map(it => [key(it), it])).values()];
+  const members = items => items.map(key).sort().join(',');
+  let previous = null;
+  for (let i = 1; i <= attempts; i += 1) {
+    const current = unique(read());
+    const id = members(current);
+    if (previous !== null && previous === id) return current;
+    previous = id;
+  }
+  throw new Error(`${what}: the list kept changing while it was read (${attempts} reads); refusing to decide on a possibly incomplete list`);
+}
+
+module.exports = { readAllPages, readAllCursors, readStable, MAX_PAGES };
