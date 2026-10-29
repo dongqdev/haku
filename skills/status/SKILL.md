@@ -16,5 +16,5 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 ## Procedure
 
 1. Run `issues.js status` and show its output as is. It prints five fixed sections, always in this order: 스토리 진행, 지금 시작할 수 있음, 막힘, 진행 중(워커), 마감 미완. An empty section says "(없음)", so a missing section means the output was cut off, not that nothing is there.
-2. If the command fails or an issue list looks cut off, stop and report the error. Never show partial results as if they were complete.
+2. If the command fails, stop and report the error. That includes "refusing to decide on a partial list": lists are read to the last page, and one that cannot be read completely is an error, not a result. Never show partial results as if they were complete.
 3. Under the tables, add at most three sentences in Korean: what the user can do next. For "마감 미완" say that `issues.js reconcile` (dry-run first) rolls those parents up, and that the user decides whether to apply it. Do not run it here.

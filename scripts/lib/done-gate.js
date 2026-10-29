@@ -13,7 +13,8 @@ function doneCheck(host, issueNumber) {
   if (!issue) return { ok: false, missing: ['issue-not-found'], base };
 
   const missing = [];
-  const merged = host.listMergedPrs(base).find(pr => prRefs(pr).has(issueNumber));
+  // Several merged pull requests can refer to one issue (a follow-up fix); the newest one is the last word.
+  const merged = host.listMergedPrs(base).filter(pr => prRefs(pr).has(issueNumber)).sort((a, b) => b.number - a.number)[0];
   if (!merged) missing.push('merged-pr');
   if (issue.state !== 'closed') missing.push('issue-closed');
 
