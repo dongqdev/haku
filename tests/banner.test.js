@@ -22,3 +22,12 @@ test(`every banner line fits ${MAX_COLUMNS} columns, so a phone does not wrap it
   assert.ok(lines.length >= 4);
   for (const line of lines) assert.ok(line.length <= MAX_COLUMNS, `${line.length} columns: "${line}"`);
 });
+
+test('the face is compact and the ears, face and mouth share one centre', () => {
+  const [ears, face, mouth] = banner[1].split('\n');
+  assert.match(face, /^\( o w o \)/);
+  const centre = (line, mark) => line.indexOf(mark);
+  assert.strictEqual(centre(face, 'w'), 4);
+  assert.strictEqual(ears.indexOf('___') + 1, 4);
+  assert.strictEqual(mouth.indexOf('vvv') + 1, 4);
+});
