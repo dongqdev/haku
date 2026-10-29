@@ -15,7 +15,8 @@ const root = path.join(__dirname, '..');
 function repo(files, { attributes = null, autocrlf = 'false' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'haku-eol-'));
   const git = (...a) => {
-    const r = spawnSync('git', ['-c', `core.autocrlf=${autocrlf}`, '-c', 'core.safecrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+    // no global attributes file either: the result must not depend on the machine's git setup
+    const r = spawnSync('git', ['-c', `core.attributesFile=${os.devNull}`, '-c', `core.autocrlf=${autocrlf}`, '-c', 'core.safecrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
     assert.strictEqual(r.status, 0, `git ${a.join(' ')}: ${r.stderr}`);
     return r.stdout;
   };
@@ -40,7 +41,7 @@ test('the repository itself commits no CRLF, and has the attribute and editor fi
 });
 
 test('a committed file with CRLF fails the check and is named', () => {
-  const { dir } = repo({ 'ok.txt': 'a\nb\n', 'bad.txt': 'a\r\nb\r\n' }, { attributes: '* -text\n' });
+  const { dir } = repo({ 'ok.txt': 'a\nb\n', 'bad.txt': 'a\r\nb\r\n' });
   const r = run(dir);
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /i\/crlf  bad\.txt/);
@@ -48,7 +49,7 @@ test('a committed file with CRLF fails the check and is named', () => {
 });
 
 test('a file that mixes both endings fails too', () => {
-  const { dir } = repo({ 'mixed.txt': 'a\nb\r\nc\n' }, { attributes: '* -text\n' });
+  const { dir } = repo({ 'mixed.txt': 'a\nb\r\nc\n' });
   const r = run(dir);
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /i\/mixed  mixed\.txt/);
@@ -74,7 +75,7 @@ test('a clean repository passes; binary files and an empty repository are not a 
 });
 
 test('--worktree also fails for a file checked out with CRLF (what an unconfigured Windows runner does)', () => {
-  const { dir, git } = repo({ 'a.txt': 'a\nb\n' }, { autocrlf: 'false' });
+  const { dir, git } = repo({ 'a.txt': 'a\nb\n' }, { attributes: '* text\n' });
   fs.rmSync(path.join(dir, 'a.txt'));
   git('-c', 'core.autocrlf=true', 'checkout', '--', 'a.txt');
   assert.strictEqual(fs.readFileSync(path.join(dir, 'a.txt'), 'utf8'), 'a\r\nb\r\n', 'the checkout produced CRLF');
@@ -97,7 +98,7 @@ test('a file that asks for CRLF on purpose is left alone in the worktree check',
 });
 
 test('names with spaces and odd characters are read correctly', () => {
-  const { dir } = repo({ 'a b/c d.txt': 'x\r\n', 'ü.txt': 'y\r\n' }, { attributes: '* -text\n' });
+  const { dir } = repo({ 'a b/c d.txt': 'x\r\n', 'ü.txt': 'y\r\n' });
   const r = run(dir);
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /i\/crlf  a b\/c d\.txt/);
@@ -138,4 +139,42 @@ test('setup proposes the attribute and editor files only when the repository has
   assert.match(setup, /`\.gitattributes` and `\.editorconfig`, \*\*only when the repository has no `\.gitattributes`\*\*/);
   assert.match(setup, /never overwrite an existing one/);
   assert.match(setup, /check-eol\.js" --worktree/);
+});
+
+test('a file deleted from the working tree (or left out of a sparse checkout) is still checked in the index', () => {
+  const { dir } = repo({ 'del.txt': 'a\r\n', 'keep.txt': 'ok\n' });
+  fs.rmSync(path.join(dir, 'del.txt'));
+  const r = run(dir);
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /i\/crlf  del\.txt/);
+  assert.deepStrictEqual(parseEol('i/crlf  w/      attr/\tdel.txt\0'), [{ index: 'crlf', work: '', attr: '', file: 'del.txt' }]);
+});
+
+test('files marked on purpose (-text, binary, eol=crlf) are left alone, an unmarked CRLF file is not', () => {
+  const { dir } = repo({ 'a.bat': 'x\r\n', 'fixture.dat': 'y\r\n', 'run.cmd': 'z\r\n', 'plain.txt': 'p\r\n' }, { attributes: '*.bat binary\n*.dat -text\n*.cmd text eol=crlf\n' });
+  const r = run(dir);
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /i\/crlf  plain\.txt/);
+  assert.doesNotMatch(r.stderr, /a\.bat|fixture\.dat|run\.cmd/);
+  assert.match(r.stderr, /1 file\(s\)/);
+});
+
+test('symlinks and submodules (an empty index column) are not counted or judged', () => {
+  const out = 'i/lf    w/lf    attr/\ta.txt\0i/      w/      attr/\tlink\0i/      w/      attr/\tsub\0';
+  assert.strictEqual(parseEol(out).length, 3);
+  const { dir } = repo({ 'a.txt': 'ok\n' });
+  const { checkEol: check } = require('../scripts/lib/eol-check');
+  assert.strictEqual(check({ cwd: dir }).checked, 1);
+});
+
+test('a file git takes for binary because of a lone CR is skipped, as any binary file is', () => {
+  const { dir } = repo({ 'lone.txt': 'a\r\nb\rc\n' });
+  assert.strictEqual(run(dir).status, 0);
+});
+
+test('the setup instruction for the attribute and editor files appears exactly once and warns about existing CRLF files', () => {
+  const setup = fs.readFileSync(path.join(root, 'skills', 'setup', 'SKILL.md'), 'utf8');
+  assert.strictEqual(setup.split('only when the repository has no `.gitattributes`').length - 1, 1);
+  assert.match(setup, /git add --renormalize \./);
+  assert.match(setup, /run `node "\$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/check-eol\.js"` before proposing it/);
 });
