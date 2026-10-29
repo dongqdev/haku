@@ -13,7 +13,7 @@ const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
-const { launchWorker, stopSession } = require('./lib/session');
+const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
@@ -71,6 +71,9 @@ function parse(argv) {
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
   return opts;
 }
+
+// How a worker's session is ended: stopped first (the conversation is kept), deleted once the worktree is gone.
+const SESSIONS = { stop: id => stopOnly({ id }), remove: id => removeSession({ id }) };
 
 const out = obj => process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
@@ -180,16 +183,16 @@ function main(argv) {
       return 0;
     }
     case 'worker-list':
-      out(listWorkers(opts.cwd || process.cwd()));
+      out(withSessionStates(listWorkers(opts.cwd || process.cwd())));
       return 0;
     case 'worker-rm': {
       needIssue(opts);
       const cwd = opts.cwd || process.cwd();
       if (opts.abandon) {
-        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true, discard: Boolean(opts.discard), stopSession: id => stopSession({ id }) }));
+        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true, discard: Boolean(opts.discard), sessions: SESSIONS }));
         return 0;
       }
-      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), discard: Boolean(opts.discard), deleteRemote: true, stopSession: id => stopSession({ id }) }));
+      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), discard: Boolean(opts.discard), deleteRemote: true, sessions: SESSIONS }));
       return 0;
     }
     case 'pr-state': {

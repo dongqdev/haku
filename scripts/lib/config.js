@@ -38,8 +38,9 @@ function readConfig(cwd = process.cwd()) {
   if ('workerMode' in config && !WORKER_MODES.includes(config.workerMode)) {
     warnings.push(`workerMode in ${file} must be one of ${WORKER_MODES.join(', ')}, not ${JSON.stringify(config.workerMode)}; "subagent" is used`);
   }
-  if ('workerPermissionMode' in config && typeof config.workerPermissionMode !== 'string') {
-    warnings.push(`workerPermissionMode in ${file} must be a string; the user's own setting is used`);
+  if ('workerPermissionMode' in config && !SAFE_PERMISSION_MODES.includes(config.workerPermissionMode)) {
+    warnings.push(`workerPermissionMode in ${file} must be one of ${SAFE_PERMISSION_MODES.join(', ')}, not ${JSON.stringify(config.workerPermissionMode)}; `
+      + `the user's own setting is used (modes that skip approvals such as auto or bypassPermissions cannot be switched on from a file in the repository, because a pull request could change that file; set them in your own Claude settings if you really want them)`);
   }
   if ('workerRemoteControl' in config && typeof config.workerRemoteControl !== 'boolean') {
     warnings.push(`workerRemoteControl in ${file} must be true or false; it stays on`);
@@ -48,13 +49,15 @@ function readConfig(cwd = process.cwd()) {
 }
 
 const WORKER_MODES = ['subagent', 'session'];
+// Modes that keep asking or restrict the worker. Approval-skipping modes are deliberately absent.
+const SAFE_PERMISSION_MODES = ['manual', 'acceptEdits', 'plan', 'dontAsk'];
 
 // How workers run. Defaults: a subagent of the orchestrator; as a session the user's own permission setting
 // applies unless a mode is named, and the session also shows up in the Claude app.
 function workerSettings(config) {
   return {
     mode: WORKER_MODES.includes(config.workerMode) ? config.workerMode : 'subagent',
-    permissionMode: typeof config.workerPermissionMode === 'string' && config.workerPermissionMode ? config.workerPermissionMode : null,
+    permissionMode: SAFE_PERMISSION_MODES.includes(config.workerPermissionMode) ? config.workerPermissionMode : null,
     remoteControl: config.workerRemoteControl !== false
   };
 }
@@ -62,4 +65,4 @@ function workerSettings(config) {
 // Only a real boolean false switches the prefix off.
 const titlePrefixOn = config => config.titlePrefix !== false;
 
-module.exports = { readConfig, repoRoot, titlePrefixOn, workerSettings, WORKER_MODES };
+module.exports = { readConfig, repoRoot, titlePrefixOn, workerSettings, WORKER_MODES, SAFE_PERMISSION_MODES };

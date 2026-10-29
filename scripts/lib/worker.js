@@ -138,7 +138,7 @@ function deleteRemoteBranch(cwd, branch, expectedTip) {
 // abandon skips the gate; discard is the explicit "throw the uncommitted files away".
 // With deleteRemote and a passing gate the remote task branch is deleted too (a branch the host already
 // deleted is not an error); abandoned work keeps its remote branch.
-function removeWorker({ cwd, issue, gate, abandon = false, discard = false, deleteRemote = false, stopSession = null }) {
+function removeWorker({ cwd, issue, gate, abandon = false, discard = false, deleteRemote = false, sessions = null }) {
   const record = listWorkers(cwd).find(w => w.issue === issue);
   if (!record) throw new Error(`no worker for #${issue}`);
   if (!abandon && !(gate && gate.ok)) {
@@ -205,6 +205,25 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
     }
   }
 
+  // A session still running in the worktree could commit between the checks above and the deletion below. So it is
+  // stopped first, and what the checks looked at is compared once more: if anything moved, nothing is deleted.
+  const sessionResult = { stopped: null, removed: null, error: null };
+  const snapshot = () => {
+    const st = present ? gitTry(record.path, ['status', '--porcelain']) : { ok: true, out: '' };
+    const tip = gitTry(cwd, ['rev-parse', record.branch]);
+    const head = present ? gitTry(record.path, ['rev-parse', 'HEAD']) : { ok: true, out: '' };
+    return [st, tip, head].map(r => (r.ok ? r.out : 'unreadable')).join('|');
+  };
+  if (record.sessionId && sessions) {
+    const before = snapshot();
+    const stop = sessions.stop(record.sessionId);
+    sessionResult.stopped = stop.stopped;
+    sessionResult.error = stop.error || null;
+    if (snapshot() !== before) {
+      throw new Error(`refusing to delete worker #${issue}; the worker's session produced new work while it was being stopped, so nothing was deleted (run worker-rm again to check the new state)`);
+    }
+  }
+
   if (present) git(cwd, ['worktree', 'remove', '--force', record.path]);
   else git(cwd, ['worktree', 'prune']);
   // Squash/rebase merges leave the branch unmerged from git's point of view, hence -D.
@@ -217,9 +236,15 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
     remoteBranchDeleted = r.deleted;
     if (!r.deleted) remoteBranchKept = r.error;
   }
-  // The worktree is gone, so ending its session cannot lose anything; a session that will not stop is reported.
-  const session = record.sessionId && stopSession ? stopSession(record.sessionId) : null;
+  // The worktree is gone, so deleting the stopped session cannot lose anything; trouble is reported, not thrown.
+  if (record.sessionId && sessions) {
+    const rm = sessions.remove(record.sessionId);
+    sessionResult.removed = rm.removed;
+    sessionResult.error = sessionResult.error || rm.error || null;
+  }
+  if (record.briefFile) fs.rmSync(record.briefFile, { force: true });
+  const session = record.sessionId && sessions ? sessionResult : null;
   return { ...record, remoteBranchDeleted, remoteBranchKept, discarded, ignoredFilesDeleted: ignored.slice(0, 20), session };
 }
 
-module.exports = { startWorker, removeWorker, listWorkers, updateRecord, workerRoot, deleteRemoteBranch, remoteBranchTip, DEFAULT_MAX_WORKERS };
+module.exports = { startWorker, removeWorker, listWorkers, updateRecord, recordDir, workerRoot, deleteRemoteBranch, remoteBranchTip, DEFAULT_MAX_WORKERS };

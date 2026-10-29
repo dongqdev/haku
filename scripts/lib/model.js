@@ -74,6 +74,15 @@ function dependsOn(issue) {
   return [...refs.matchAll(/(?<![\w/])#(\d+)/g)].map(x => Number(x[1]));
 }
 
+// The part of an issue body a reader of the GitHub page actually sees as the author's own words: no HTML
+// comments (hidden on the page), no fenced code (``` or ~~~), no quotes. Anything that turns issue text into
+// instructions for a worker must read it through this.
+function readableText(body) {
+  return stripNonClaims(body)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '');
+}
+
 // The numbers in a parent's "## Children" checklist ("- [ ] #12 title"), as publish writes them. Only that
 // section counts: a task list elsewhere in the body ("- [ ] #99 upstream bug") names no child. Comments, code
 // and quotes are ignored like everywhere else a body is read.
@@ -152,6 +161,7 @@ module.exports = {
   issueOwner,
   parentOf,
   checklistNumbers,
+  readableText,
   dependsOn,
   closingRefsFromText,
   issueFromBranch,

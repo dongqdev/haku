@@ -53,10 +53,10 @@ Every task PR is written in Korean with the same sections: 요약 (what), 이유
 | `.haku/config.json` | Meaning |
 |---|---|
 | `workerMode` | `"subagent"` (default) or `"session"` |
-| `workerPermissionMode` | a Claude Code permission mode for session workers; unset means the user's own setting |
+| `workerPermissionMode` | one of `manual`, `acceptEdits`, `plan`, `dontAsk` for session workers; unset means the user's own setting. Modes that skip approvals (`auto`, `bypassPermissions`) cannot be set here, because a pull request could change this file; use your own Claude settings if you really want them |
 | `workerRemoteControl` | `false` keeps session workers out of the Claude app sidebar (default `true`) |
 
-Session workers need the `claude` command on `PATH` (set `HAKU_CLAUDE_BIN` to use another; on Windows `claude.exe`, not a `.cmd` shim), a repository that has been trusted once in an interactive `claude`, and the same Claude account as the orchestrator so that messages can be delivered. `issues.js config` prints the settings in effect.
+Session workers need the `claude` command on `PATH` (set `HAKU_CLAUDE_BIN` to use another; on Windows `claude.exe`, not a `.cmd` shim), a repository that has been trusted once in an interactive `claude`, and the same Claude account as the orchestrator so that messages can be delivered. `issues.js config` prints the settings in effect and `issues.js worker-list` shows each session worker's live state: a worker whose state is `blocked` is waiting for a permission approval and cannot report.
 
 ## Labels and titles
 
