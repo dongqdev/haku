@@ -21,7 +21,7 @@ function main(base) {
   const marketplace = read('.claude-plugin/marketplace.json');
 
   const baseVersion = JSON.parse(git('show', `${base}:.claude-plugin/plugin.json`)).version;
-  const changedFiles = git('diff', '--name-only', `${base}...HEAD`).split('\n').filter(Boolean);
+  const changedFiles = git('diff', '--name-only', '--no-renames', `${base}...HEAD`).split('\n').filter(Boolean);
   const problems = [
     ...manifestProblems(plugin, marketplace),
     ...bumpProblems({ changedFiles, baseVersion, version: plugin.version })

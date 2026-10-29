@@ -4,15 +4,18 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
-const { needsBump, manifestProblems, bumpProblems } = require('../scripts/lib/version-check');
+const { needsBump, compareVersions, manifestProblems, bumpProblems } = require('../scripts/lib/version-check');
 
-test('only files the plugin ships require a version bump', () => {
+test('everything except docs, tests and CI requires a version bump', () => {
+  assert.strictEqual(needsBump(['hooks/hooks.json']), true);
+  assert.strictEqual(needsBump(['commands/x.md']), true);
+  assert.strictEqual(needsBump(['.mcp.json']), true);
   assert.strictEqual(needsBump(['skills/plan/SKILL.md']), true);
   assert.strictEqual(needsBump(['agents/worker.md']), true);
   assert.strictEqual(needsBump(['scripts/lib/model.js']), true);
   assert.strictEqual(needsBump(['.claude-plugin/plugin.json']), true);
   assert.strictEqual(needsBump(['scripts\\lib\\model.js']), true);
-  assert.strictEqual(needsBump(['README.md', 'tests/a.test.js', '.github/workflows/test.yml']), false);
+  assert.strictEqual(needsBump(['README.md', 'LICENSE', 'tests/a.test.js', '.github/workflows/test.yml']), false);
 });
 
 test('a shipped change with an unchanged version is a problem, a raised version is not', () => {
@@ -32,4 +35,12 @@ test('manifest versions must match', () => {
 test('this repository\'s own manifests agree', () => {
   const read = f => JSON.parse(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'));
   assert.deepStrictEqual(manifestProblems(read('.claude-plugin/plugin.json'), read('.claude-plugin/marketplace.json')), []);
+});
+
+test('the version may not go down or stop being x.y.z', () => {
+  const changedFiles = ['skills/plan/SKILL.md'];
+  assert.match(bumpProblems({ changedFiles, baseVersion: '0.2.0', version: '0.1.9' })[0], /lower/);
+  assert.match(bumpProblems({ changedFiles, baseVersion: '0.2.0', version: 'banana' })[0], /not x\.y\.z/);
+  assert.match(bumpProblems({ changedFiles: ['README.md'], baseVersion: '0.2.0', version: '0.1.0' })[0], /lower/);
+  assert.strictEqual(compareVersions('0.10.0', '0.9.0') > 0, true);
 });
