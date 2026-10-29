@@ -8,24 +8,43 @@ const path = require('path');
 // Windows checkouts use CRLF; normalize so paragraph splitting behaves the same everywhere.
 const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 
-// The same decision rule must read identically in every skill, or the sessions drift apart.
-const RULE_START = '## Decisions';
-const ruleOf = text => {
-  const i = text.indexOf(RULE_START);
-  assert.notStrictEqual(i, -1, 'missing "## Decisions" section');
-  return text.slice(i).split(/\n\n/)[1];
-};
+// The exact rule text. Comparing the whole paragraph means a deleted or reversed sentence fails.
+const RULE = 'Ask the user to decide only through a choice question (AskUserQuestion), never as a free-text question. '
+  + 'Put the recommended option first and mark it "(Recommended)". Notices and reports are plain text. '
+  + 'Write the question text as literal UTF-8; never use `\\uXXXX` escapes, which can garble Korean. '
+  + 'Only the orchestrator talks to the user; a worker that needs a decision sends it to the orchestrator.';
 
-test('setup, plan and build carry the same decision rule', () => {
-  const rules = ['skills/setup/SKILL.md', 'skills/plan/SKILL.md', 'skills/build/SKILL.md'].map(f => ruleOf(read(f)));
-  assert.strictEqual(new Set(rules).size, 1);
-  assert.match(rules[0], /only through a choice question \(AskUserQuestion\), never as a free-text question/);
-  assert.match(rules[0], /literal UTF-8/);
-  assert.match(rules[0], /Only the orchestrator talks to the user/);
+const WORKER_SECTION = 'You never talk to the user. If you need a decision (scope change, a failing approach, an unclear criterion), '
+  + 'stop and put the decision request in your report to the orchestrator, with the options you see and your recommendation. '
+  + 'The orchestrator asks the user through a choice question and relays the answer. '
+  + 'Reports and summaries go to the orchestrator and into the file it names.';
+
+const SKILLS = ['setup', 'plan', 'build'].map(n => `skills/${n}/SKILL.md`);
+
+// Text of a "## <title>" section up to the next "## " heading.
+function section(text, title) {
+  const m = text.match(new RegExp(`^## ${title}\\n\\n([\\s\\S]*?)(?=\\n## |$)`, 'm'));
+  assert.ok(m, `missing "## ${title}" section`);
+  return m[1].trim();
+}
+
+test('setup, plan and build carry exactly the decision rule', () => {
+  for (const f of SKILLS) assert.strictEqual(section(read(f), 'Decisions'), RULE, f);
 });
 
-test('the worker never talks to the user and escalates decisions to the orchestrator', () => {
-  const worker = read('agents/worker.md');
-  assert.match(worker, /You never talk to the user/);
-  assert.match(worker, /send it to the orchestrator/);
+test('the decision rule comes before any procedure heading, so it is read before acting', () => {
+  for (const f of SKILLS) {
+    const headings = [...read(f).matchAll(/^## .*$/gm)].map(m => m[0]);
+    assert.strictEqual(headings[0], '## Decisions', `${f}: first section is ${headings[0]}`);
+  }
+});
+
+test('the worker never talks to the user and escalates through its report', () => {
+  assert.strictEqual(section(read('agents/worker.md'), 'Talking to the user'), WORKER_SECTION);
+});
+
+test('the T3 verdict is asked as a choice question, not read from a comment', () => {
+  const build = read('skills/build/SKILL.md');
+  assert.match(build, /ask the verdict with a choice question \(통과 \/ 실패 \/ 추가 측정 필요\)/);
+  assert.doesNotMatch(build, /코멘트로 남겨 주세요/);
 });

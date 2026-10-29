@@ -21,7 +21,7 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 4. **Verify by tier** (from the task's `Verify-Kind`):
    - **T1:** `issues.js verify --profile <Verify-Profile> --base <default branch> --cwd <worktree>`. Exit 0 = pass. Exit 2 = a test file shrank: read the diff yourself and decide; do not pass it silently. Exit 1 = fail: send the reasons back to the worker.
    - **T2:** wait for the platform CI job (or the user's runner) to report; treat the check result as the verdict.
-   - **T3:** produce a **measurement document** (see below), set the task to waiting for the user, and stop for that task. The user's "통과" also counts as merge consent for that PR; show the closing list first (step 5).
+   - **T3:** produce a **measurement document** (see below), set the task to waiting for the user, and stop for that task. When the user reports the measurement is done, ask the verdict with a choice question (통과 / 실패 / 추가 측정 필요). A "통과" answer also counts as merge consent for that PR, so put the closing list (step 5) in the same question.
 5. **Merge approval.** First check the PR body: save it (`gh pr view <n> --json body --jq .body`) and run `issues.js pr-check --issue N --file <file>`. If it fails, send the problems back to the worker; do not ask for approval on a PR with a failing body. Then list what the merge will do: `이 병합으로 닫힐 이슈: #N` plus any parent that will roll up. Ask with a choice question (literal UTF-8). In `approve-each` mode every merge needs the user's yes; in `auto-when-verified` mode only T1/T2 tasks that passed and are inside their scope may merge without asking. Merge with `gh pr merge <n> --squash`. Never merge a PR whose checks are failing.
 6. **After the merge:**
    - Update the default branch locally and run `issues.js verify` there. Record the outcome: `issues.js verify-record --issue N --kind <T1|T2|T3> --status <pass|fail> --sha <sha>`. A failure reopens the task and goes back to a worker.
@@ -39,7 +39,7 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 
 ## Measurement document (T3)
 
-Create it as a comment on the task issue and as a file in the PR description area: prerequisites, numbered steps, the expected value per step, and a results table for the user to fill (measured value, pass/fail, evidence). End with "통과/실패 중 하나를 코멘트로 남겨 주세요". On "실패" return the recorded results to a worker; on "통과" continue at step 5.
+Create it as a comment on the task issue and as a file in the PR description area: prerequisites, numbered steps, the expected value per step, and a results table for the user to fill (measured value, pass/fail, evidence). The comment only records measured values and evidence; the verdict is never read from free text. When the user says the measurement is done, ask the verdict with a choice question (통과 / 실패 / 추가 측정 필요). On "실패" return the recorded results to a worker; on "통과" continue at step 5 (that answer is the merge consent).
 
 ## Never
 
