@@ -74,7 +74,7 @@ function parse(argv) {
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
-  if (opts.pr !== undefined) opts.pr = Number(opts.pr);
+  if (opts.pr !== undefined) opts.pr = /^[1-9]\d*$/.test(opts.pr) ? Number(opts.pr) : NaN;
   return opts;
 }
 
@@ -237,7 +237,7 @@ function main(argv) {
     case 'pr-check': {
       needIssue(opts);
       if (!opts.file && opts.pr === undefined) throw new Error('--file <body.md> or --pr <number> is required');
-      if (opts.pr !== undefined && !Number.isInteger(opts.pr)) throw new Error('--pr needs a pull request number');
+      if (opts.pr !== undefined && !(Number.isInteger(opts.pr) && opts.pr > 0)) throw new Error('--pr needs a pull request number');
       const problems = [];
       if (opts.file) problems.push(...checkBody(fs.readFileSync(opts.file, 'utf8'), opts.issue).problems);
       if (opts.pr !== undefined) problems.push(...checkClosingLink(host(), opts.pr, opts.issue).problems);

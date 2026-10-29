@@ -107,7 +107,9 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       const pr = JSON.parse(gh(['pr', 'view', String(number), ...scope, '--json', 'number,state,closingIssuesReferences']));
       const refs = pr.closingIssuesReferences || [];
       if (refs.length >= limit) throw new Error(`pull request #${number} links ${refs.length} issues, which reaches the limit of ${limit}; refusing to decide on a partial list`);
-      return { number: pr.number, state: String(pr.state).toLowerCase(), issues: refs.map(r => r.number) };
+      // The repository comes with every reference: "#20" of another repository is not this repository's #20.
+      const repoOf = r => (r.repository && r.repository.owner && r.repository.name ? `${r.repository.owner.login}/${r.repository.name}` : null);
+      return { number: pr.number, state: String(pr.state).toLowerCase(), repo: repoSlug(), issues: refs.map(r => ({ number: r.number, repo: repoOf(r) })) };
     },
 
     // Every pull request ever opened from this branch, in any state: the branch name alone is not

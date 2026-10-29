@@ -96,7 +96,7 @@ function defaultSleep(ms) {
 }
 
 // Does GitHub itself link this pull request to exactly the expected issue? The body text alone cannot say: a
-// closing line in another repository, a typo, "Closed #N" or a line in a code block links nothing. GitHub updates
+// closing line that names another repository's issue, a typo, "Closed #N" or a line in a code block links nothing. GitHub updates
 // the link a moment after the body changes, so an empty answer is read once more after a pause.
 function checkClosingLink(host, pr, issue, { sleep = defaultSleep, waitMs = 5000 } = {}) {
   let linked = host.prClosingIssues(pr);
@@ -105,11 +105,15 @@ function checkClosingLink(host, pr, issue, { sleep = defaultSleep, waitMs = 5000
     linked = host.prClosingIssues(pr);
   }
   const problems = [];
+  // Only an open pull request can still close anything: a closed one keeps its links but never closes the issue.
+  if (linked.state !== 'open') problems.push(`PR #${pr}는 열려 있지 않습니다(${linked.state}): 병합 전에만 점검할 수 있습니다`);
+  const name = i => (i.repo && i.repo.toLowerCase() !== String(linked.repo).toLowerCase() ? `${i.repo}#${i.number}` : `#${i.number}`);
+  const same = i => i.number === issue && i.repo && String(linked.repo).toLowerCase() === i.repo.toLowerCase();
   if (linked.issues.length === 0) problems.push(`GitHub는 PR #${pr}에 연결된 이슈가 없다고 답합니다: 병합해도 #${issue}가 닫히지 않습니다 (닫는 줄을 확인하세요)`);
-  else if (linked.issues.length !== 1 || linked.issues[0] !== issue) {
-    problems.push(`GitHub가 PR #${pr}에 연결한 이슈는 ${linked.issues.map(n => `#${n}`).join(', ')}이며, 기대한 #${issue} 하나와 같지 않습니다`);
+  else if (linked.issues.length !== 1 || !same(linked.issues[0])) {
+    problems.push(`GitHub가 PR #${pr}에 연결한 이슈는 ${linked.issues.map(name).join(', ')}이며, 이 저장소의 기대한 #${issue} 하나와 같지 않습니다`);
   }
-  return { ok: problems.length === 0, problems, linked: linked.issues };
+  return { ok: problems.length === 0, problems, linked: linked.issues.map(name) };
 }
 
 module.exports = { SECTIONS, skeleton, checkBody, checkClosingLink };
