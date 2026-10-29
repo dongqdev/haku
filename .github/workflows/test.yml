@@ -19,6 +19,9 @@ jobs:
         run: |
           git config --global user.name ci
           git config --global user.email ci@example.com
+      - name: Check line endings (committed files and the checkout on this system)
+        shell: bash
+        run: node scripts/check-eol.js --worktree
       - name: Run tests
         shell: bash
         run: node --test tests/*.test.js

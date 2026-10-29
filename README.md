@@ -35,6 +35,10 @@ You normally type only these two. `plan` hands a vague goal to `sniff` first and
 4. Merging needs the user's approval per PR (the screen lists the issues that will close). Automatic merging exists only as an explicit per-story opt-in for verified T1/T2 work.
 5. After the merge: verification on the default branch, `reconcile` closes merged-but-open tasks and rolls up milestones and stories, then the worker is deleted - only if its summary and passing verification are recorded. `reconcile` does not roll a story or milestone up over a task that was closed without a merged pull request (closed by hand, only an open or an unmerged pull request, or not checkable): it reports the task and why, and the user decides with a choice question; `issues.js accept-close --issue N --reason <why>` records a task closed on purpose and lets its parent roll up.
 
+## Line endings
+
+`.gitattributes` (`* text=auto eol=lf`, binary exceptions) and `.editorconfig` keep text files LF on every system, so a Windows checkout does not turn them into CRLF. `node scripts/check-eol.js [--worktree]` fails when a committed text file holds CRLF or a mix, and with `--worktree` also when the checked-out file does; the workflow runs it on Linux, Windows and macOS. `setup` proposes the two files in the setup pull request when the target repository has no `.gitattributes`.
+
 ## Branch protection and merge modes
 
 `issues.js branch-protection` reads, without changing anything, whether the default branch is protected: `protected`, `unprotected` (it can be switched on in the repository settings), `unavailable` (the plan does not allow it, for example a private repository on a free plan) or `unknown` (not checkable). `auto-when-verified` is allowed only for `protected`; in every other state the merge mode is `approve-each` and the command prints the safeguards to rely on instead (required check CI, workers never push to the default branch, `pr-state` and `pr-check --pr` before each merge). `setup` reports the state, `plan` offers the mode only when it is allowed, and `build` checks it again right before an automatic merge.

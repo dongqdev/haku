@@ -7,7 +7,7 @@
       "name": "haku",
       "source": "./",
       "description": "Git-issue driven planning, orchestrator/worker development and verified merge-to-close for Claude Code (GitHub first)",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "category": "workflow"
     }
   ]
