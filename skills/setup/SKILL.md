@@ -20,7 +20,8 @@ Start by printing this banner once, exactly as written, then continue:
 ```text
  /\__/\
 ( o  w o )  haku
- \_vv__/    Harness Assistant Keeping Users in the loop
+ \_vv__/    Harness Assistant
+            Keeping Users in the loop
 ```
 
 ## 0. No repository yet? Start a new project
