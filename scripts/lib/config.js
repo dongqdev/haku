@@ -42,6 +42,9 @@ function readConfig(cwd = process.cwd()) {
     warnings.push(`workerPermissionMode in ${file} must be one of ${SAFE_PERMISSION_MODES.join(', ')}, not ${JSON.stringify(config.workerPermissionMode)}; `
       + `the user's own setting is used (modes that skip approvals such as auto or bypassPermissions cannot be switched on from a file in the repository, because a pull request could change that file; set them in your own Claude settings if you really want them)`);
   }
+  if ('mergeMode' in config && !['approve-each', 'auto-when-verified'].includes(config.mergeMode)) {
+    warnings.push(`mergeMode in ${file} must be approve-each or auto-when-verified, not ${JSON.stringify(config.mergeMode)}; approve-each is used`);
+  }
   if ('watchFiles' in config && !(Array.isArray(config.watchFiles) && config.watchFiles.every(p => typeof p === 'string' && p.trim()))) {
     warnings.push(`watchFiles in ${file} must be a list of path patterns; it is ignored`);
   }
