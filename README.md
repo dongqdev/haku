@@ -36,7 +36,9 @@ Then in the repository you want to work on:
 
 Claude Code keeps an installed plugin in a cache keyed by its **version**, so a merged change that keeps the version never reaches an installed copy (`plugin update` answers "already at the latest version"). Every PR that changes `skills/`, `agents/`, `scripts/` or `.claude-plugin/` must therefore raise the version in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`; CI (`scripts/check-version.js`) enforces this. Use a patch bump for fixes, a minor bump for new behavior, and a minor bump with a note for renames while the version is below 1.0.
 
-To pick up a release in a running session: `/plugin marketplace update haku`, then `/plugin update haku@haku`, then `/reload-plugins`.
+To pick up a release in a running session, run `/plugin marketplace update haku` and then `/reload-plugins`. If the session still shows the old skills, run `claude plugin update haku@haku` in a terminal and restart the session (there is no `/plugin update` command inside a session).
+
+Coming from the earlier name? See [docs/upgrading.md](docs/upgrading.md).
 
 ## Pull request bodies
 

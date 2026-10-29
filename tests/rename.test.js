@@ -7,8 +7,15 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-// Built from parts so this file does not contain the strings it forbids.
-const OLD = [['ecc', 'harness'].join('-'), ['ECC', 'HARNESS'].join('_'), ['.', 'eh', '/'].join('')];
+
+// The old names, matched loosely (any case, separators, camelCase, the old short home folder) so a slight
+// respelling cannot slip back in. Built from parts so this file does not contain the strings it forbids.
+const OLD_NAME = new RegExp(['ecc', '[\\s_.-]?', 'harness'].join(''), 'i');
+const OLD_HOME = new RegExp(['(^|[^\\w])\\.', 'eh', '(?![\\w])'].join(''), 'm');
+const findOld = text => [OLD_NAME, OLD_HOME].filter(re => re.test(text)).map(re => re.source);
+
+// Files allowed to name the old project: the licence credit and the upgrade guide.
+const ALLOWED = new Set(['LICENSE', 'docs/upgrading.md']);
 
 function files(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
@@ -18,13 +25,25 @@ function files(dir) {
   });
 }
 
-test('no old project names remain outside the license attribution', () => {
+test('the detector catches every respelling of the old names', () => {
+  const old = ['ecc', 'harness'];
+  const spellings = [
+    old.join('-'), old.join('_').toUpperCase(), old.join(' '), old.join(''), 'Ecc' + 'Harness', old.join('.'),
+    "path.join(os.homedir(), '." + 'eh' + "')", 'C:\\Users\\x\\.' + 'eh' + '\\w', '~/.' + 'eh' + '/w', '.' + 'eh'
+  ];
+  for (const s of spellings) assert.ok(findOld(s).length > 0, `not detected: ${s}`);
+  for (const ok of ['haku-harness', '.haku/w', 'the ECC project', 'some.method()', 'whenever']) {
+    assert.deepStrictEqual(findOld(ok), [], `false positive: ${ok}`);
+  }
+});
+
+test('no old project names remain outside the licence credit and the upgrade guide', () => {
   const hits = [];
   for (const f of files(root)) {
     const rel = path.relative(root, f).replace(/\\/g, '/');
-    if (rel === 'LICENSE' || /\.(png|jpg|ico)$/.test(rel)) continue;
-    const text = fs.readFileSync(f, 'utf8');
-    for (const old of OLD) if (text.toLowerCase().includes(old.toLowerCase())) hits.push(`${rel}: ${old}`);
+    if (ALLOWED.has(rel) || /\.(png|jpg|ico)$/.test(rel)) continue;
+    const found = findOld(fs.readFileSync(f, 'utf8'));
+    if (found.length) hits.push(`${rel}: ${found.join(', ')}`);
   }
   assert.deepStrictEqual(hits, []);
 });
