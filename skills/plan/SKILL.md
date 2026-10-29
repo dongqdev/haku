@@ -9,6 +9,10 @@ The session that runs this skill is the **orchestrator** of the resulting story.
 
 Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
+## Decisions
+
+Ask the user to decide only through a choice question (AskUserQuestion), never as a free-text question. Put the recommended option first and mark it "(Recommended)". Notices and reports are plain text. Write the question text as literal UTF-8; never use `\uXXXX` escapes, which can garble Korean. Only the orchestrator talks to the user; a worker that needs a decision sends it to the orchestrator.
+
 ## 1. Understand
 
 Read the repository (read-only) and the user's goal. Read `.ecc-harness/config.json` (assignee, maxWorkers, mergeMode) and `.ecc-harness/verify.json` from the **default branch** to learn which verify profiles exist. If either is missing, stop and point to `/ecc-harness:setup`.

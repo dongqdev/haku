@@ -9,6 +9,10 @@ Prepare the current repository for ecc-harness. Everything is **shown first and 
 
 Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js` below).
 
+## Decisions
+
+Ask the user to decide only through a choice question (AskUserQuestion), never as a free-text question. Put the recommended option first and mark it "(Recommended)". Notices and reports are plain text. Write the question text as literal UTF-8; never use `\uXXXX` escapes, which can garble Korean. Only the orchestrator talks to the user; a worker that needs a decision sends it to the orchestrator.
+
 ## 1. Preflight (read-only, run all, report as a table)
 
 | Check | How | If it fails |
