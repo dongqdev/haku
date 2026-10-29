@@ -1,6 +1,6 @@
 ---
 name: build
-description: Orchestrate development of a registered story - start workers per ready task, verify, ask for merge approval, close issues, and delete finished workers. Resumes from the Git issues if the session was lost. Use on "/ecc-harness:build <story issue>" or right after plan.
+description: Orchestrate development of a registered story - start workers per ready task, verify, ask for merge approval, close issues, and delete finished workers. Resumes from the Git issues if the session was lost. Use on "/haku:build <story issue>" or right after plan.
 ---
 
 # build

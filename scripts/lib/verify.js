@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const CONFIG_PATH = '.ecc-harness/verify.json';
+const CONFIG_PATH = '.haku/verify.json';
 const DEFAULT_TEST_FILE = /(^|\/)(tests?|__tests__)\/|\.(test|spec)\.[a-z0-9]+$|_test\.[a-z0-9]+$/i;
 
 function git(args, cwd) {

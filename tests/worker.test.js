@@ -77,7 +77,7 @@ test('abandon deletes without a gate (caller must have recorded why)', () => {
 });
 
 const fakeHost = issues => ({ listIssues: () => issues });
-const issue = (number, type, state = 'open') => ({ number, state, labels: [{ name: 'ecc-harness' }, { name: `type:${type}` }] });
+const issue = (number, type, state = 'open') => ({ number, state, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
 
 test('start refuses issues that are not open tasks', () => {
   const { repo, home } = setup();

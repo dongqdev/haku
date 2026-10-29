@@ -4,7 +4,7 @@
 // "Parent: #N" line in the body, so it works identically on GitHub and GitLab.
 
 const TYPES = ['story', 'milestone', 'task'];
-const BASE_LABEL = 'ecc-harness';
+const BASE_LABEL = 'haku';
 
 const typeLabel = type => `type:${type}`;
 // Who owns an issue is the host's assignee. The owner label is only the fallback for people
@@ -34,6 +34,14 @@ function stripNonClaims(text) {
     .replace(/^\s*>.*$/gm, '');
 }
 
+// "Depends-On: #3, #4" -> [3, 4] (the body line publish writes for dependent tasks).
+function dependsOn(issue) {
+  const m = stripNonClaims(issue.body).match(/^Depends-On:\s*(.+)$/im);
+  if (!m) return [];
+  const refs = m[1].replace(/\([^)]*\)/g, '');
+  return [...refs.matchAll(/(?<![\w/])#(\d+)/g)].map(x => Number(x[1]));
+}
+
 function parentOf(issue) {
   const m = stripNonClaims(issue.body).match(/^Parent:\s*#(\d+)\s*$/im);
   return m ? Number(m[1]) : null;
@@ -54,15 +62,15 @@ function issueFromBranch(branch) {
   return m ? Number(m[1]) : null;
 }
 
-const SUMMARY_MARKER = '<!-- ecc-harness:worker-summary -->';
-const VERIFIED_PREFIX = '<!-- ecc-harness:verified';
+const SUMMARY_MARKER = '<!-- haku:worker-summary -->';
+const VERIFIED_PREFIX = '<!-- haku:verified';
 
 function verifiedMarker({ kind, status, sha }) {
   return `${VERIFIED_PREFIX} kind=${kind} status=${status} sha=${sha || 'unknown'} -->`;
 }
 
 function parseVerifiedMarker(text) {
-  const m = String(text || '').match(/<!-- ecc-harness:verified kind=(\S+) status=(\S+) sha=(\S+) -->/);
+  const m = String(text || '').match(/<!-- haku:verified kind=(\S+) status=(\S+) sha=(\S+) -->/);
   return m ? { kind: m[1], status: m[2], sha: m[3] } : null;
 }
 
@@ -91,6 +99,7 @@ module.exports = {
   issueType,
   issueOwner,
   parentOf,
+  dependsOn,
   closingRefsFromText,
   issueFromBranch,
   prRefs,

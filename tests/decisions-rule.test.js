@@ -19,7 +19,8 @@ const WORKER_SECTION = 'You never talk to the user. If you need a decision (scop
   + 'The orchestrator asks the user through a choice question and relays the answer. '
   + 'Reports and summaries go to the orchestrator and into the file it names.';
 
-const SKILLS = ['setup', 'plan', 'build'].map(n => `skills/${n}/SKILL.md`);
+// Every skill, so a new skill cannot skip the rule.
+const SKILLS = fs.readdirSync(path.join(__dirname, '..', 'skills')).sort().map(n => `skills/${n}/SKILL.md`);
 
 // Text of a "## <title>" section up to the next "## " heading.
 function section(text, title) {
@@ -28,7 +29,8 @@ function section(text, title) {
   return m[1].trim();
 }
 
-test('setup, plan and build carry exactly the decision rule', () => {
+test('every skill carries exactly the decision rule', () => {
+  assert.ok(SKILLS.length >= 7, `expected the full skill set, found ${SKILLS.length}`);
   for (const f of SKILLS) assert.strictEqual(section(read(f), 'Decisions'), RULE, f);
 });
 

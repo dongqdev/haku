@@ -10,8 +10,10 @@ const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { skeleton, checkBody } = require('./lib/pr-body');
+const { buildStatus, renderStatus } = require('./lib/status');
+const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 
-const HELP = `ecc-harness issues
+const HELP = `haku issues
 
 Usage:
   issues.js publish <draft.json> [--apply] [--orchestrator <id>] [--repo <owner/repo>]
@@ -23,6 +25,9 @@ Usage:
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
   issues.js worker-list [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon]
+  issues.js status [--json] [--repo <owner/repo>]
+  issues.js triage [--json] [--repo <owner/repo>]
+  issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js pr-body --issue <N>
   issues.js pr-check --issue <N> --file <body.md>
   issues.js branch --issue <N> --title <text>
@@ -35,7 +40,7 @@ done-check    Exit 0 only when a worker may be deleted.
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -46,7 +51,12 @@ function parse(argv) {
     else if (arg === '--trust-working-copy') opts.trust = true;
     else if (arg === '--abandon') opts.abandon = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
-    else if (VALUE.has(arg)) opts[arg.slice(2)] = argv[++i];
+    else if (VALUE.has(arg)) {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) throw new Error(`${arg} needs a value`);
+      opts[arg.slice(2)] = value;
+      i += 1;
+    }
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
@@ -146,6 +156,23 @@ function main(argv) {
       out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), deleteRemote: true }));
       return 0;
     }
+    case 'status': {
+      const s = buildStatus(host().listIssues(), listWorkers(opts.cwd || process.cwd()));
+      if (opts.json) out(s); else process.stdout.write(renderStatus(s));
+      return 0;
+    }
+    case 'triage': {
+      const t = buildTriage(host().listBacklog());
+      if (opts.json) out(t); else process.stdout.write(renderTriage(t));
+      return 0;
+    }
+    case 'issue-close': {
+      needIssue(opts);
+      if (!opts.reason || !opts.reason.trim()) throw new Error('--reason <text> is required: say why the issue is closed');
+      closeForTriage(host(), opts.issue, opts.reason);
+      console.log(`#${opts.issue} closed as not planned`);
+      return 0;
+    }
     case 'pr-body':
       needIssue(opts);
       process.stdout.write(skeleton(opts.issue));
@@ -175,7 +202,7 @@ if (require.main === module) {
   try {
     process.exit(main(process.argv.slice(2)));
   } catch (err) {
-    console.error(`[ecc-harness] ${err.message}`);
+    console.error(`[haku] ${err.message}`);
     process.exit(1);
   }
 }

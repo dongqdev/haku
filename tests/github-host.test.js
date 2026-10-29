@@ -19,7 +19,7 @@ function fakeExec(handlers) {
 
 const created = 'https://github.com/o/r/issues/7\n';
 const host = exec => createGitHubHost({ repo: 'o/r', exec });
-const base = { title: 't', body: 'b', labels: ['ecc-harness'] };
+const base = { title: 't', body: 'b', labels: ['haku'] };
 
 test('an assignee that stuck needs no owner label', () => {
   const { exec, calls } = fakeExec({

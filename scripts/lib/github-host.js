@@ -22,7 +22,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
   }
 
   function withBodyFile(body, fn) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-harness-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'haku-'));
     const file = path.join(dir, 'body.md');
     fs.writeFileSync(file, body, 'utf8');
     try {
@@ -44,6 +44,20 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
         '--limit', '1000', '--json', 'number,title,body,state,labels,assignees'
       ]);
       return JSON.parse(out).map(i => ({ ...i, state: String(i.state).toLowerCase() }));
+    },
+
+    // Every open issue, labelled or not: the backlog is mostly issues nobody labelled.
+    listBacklog() {
+      const out = gh([
+        'issue', 'list', ...scope, '--state', 'open', '--limit', '1000', '--json', 'number,title,body,state,labels,assignees'
+      ]);
+      return JSON.parse(out).map(i => ({ ...i, state: String(i.state).toLowerCase() }));
+    },
+
+    // One issue by number (not through the list, which lags right after creation).
+    getIssue(number) {
+      const i = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'number,title,body,state,labels,assignees']));
+      return { ...i, state: String(i.state).toLowerCase() };
     },
 
     listMergedPrs(base) {
@@ -92,7 +106,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
             gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
           }
         } catch (err) {
-          process.stderr.write(`[ecc-harness] warning: issue #${number} created, but the owner could not be recorded: ${String(err.message).split('\n')[0]}\n`);
+          process.stderr.write(`[haku] warning: issue #${number} created, but the owner could not be recorded: ${String(err.message).split('\n')[0]}\n`);
         }
       }
       return number;
@@ -111,11 +125,12 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       withBodyFile(body, file => gh(['issue', 'comment', String(number), ...scope, '--body-file', file]));
     },
 
-    closeIssue(number, comment) {
+    // Work that merged is "completed"; triage closes (duplicate, obsolete) are "not planned".
+    closeIssue(number, comment, stateReason = 'completed') {
       withBodyFile(comment, file => {
         gh(['issue', 'comment', String(number), ...scope, '--body-file', file]);
       });
-      gh(['issue', 'close', String(number), ...scope, '--reason', 'completed']);
+      gh(['issue', 'close', String(number), ...scope, '--reason', stateReason]);
     }
   };
 }

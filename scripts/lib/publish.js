@@ -23,7 +23,7 @@ function validateDraft(draft) {
       return;
     }
     if ((v.kind === 'T1' || v.kind === 'T2') && !v.profile) {
-      errors.push(`${where}: verify.profile is required for ${v.kind} (a name defined in .ecc-harness/verify.json)`);
+      errors.push(`${where}: verify.profile is required for ${v.kind} (a name defined in .haku/verify.json)`);
     }
   };
   const uniq = (where, id) => {
