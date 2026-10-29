@@ -4,7 +4,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { BASE_LABEL, ownerLabel } = require('./model');
+const { BASE_LABEL, ownerLabel, labelStyle } = require('./model');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
@@ -30,6 +30,11 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  }
+
+  function createLabel(name) {
+    const style = labelStyle(name);
+    gh(['label', 'create', name, ...scope, '--force', '--color', style.color, ...(style.description ? ['--description', style.description] : [])]);
   }
 
   return {
@@ -74,10 +79,9 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       }));
     },
 
+    // --force also updates the colour and description of a label that already exists.
     ensureLabels(names) {
-      for (const name of names) {
-        gh(['label', 'create', name, ...scope, '--force', '--color', 'ededed']);
-      }
+      for (const name of names) createLabel(name);
     },
 
     // The assignee owns the issue. GitHub silently drops an assignee it cannot assign (for example
@@ -102,7 +106,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
             .assignees.map(a => String(a.login).toLowerCase());
           if (!assigned.includes(String(assignee).toLowerCase())) {
             const label = ownerLabel(assignee);
-            gh(['label', 'create', label, ...scope, '--force', '--color', 'ededed']);
+            createLabel(label);
             gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
           }
         } catch (err) {

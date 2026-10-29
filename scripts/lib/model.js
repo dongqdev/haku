@@ -11,6 +11,33 @@ const typeLabel = type => `type:${type}`;
 // who cannot be assigned (for example, not a collaborator on the repository).
 const ownerLabel = name => `owner:${name}`;
 
+// Label colours and descriptions. The set follows the Okabe-Ito palette, which stays distinguishable
+// for people with colour-vision differences. Unknown labels keep the neutral grey.
+const LABEL_STYLES = {
+  [BASE_LABEL]: { color: 'A0724A', description: 'Managed by haku' },
+  [typeLabel('story')]: { color: '0072B2', description: 'Story: a big goal' },
+  [typeLabel('milestone')]: { color: '009E73', description: 'Milestone: a stage of a story' },
+  [typeLabel('task')]: { color: 'E69F00', description: 'Task: what one worker does' }
+};
+const PREFIX_STYLES = [
+  ['sprint:', { color: 'CC79A7', description: 'Sprint' }],
+  ['owner:', { color: '56B4E9', description: 'Owner (could not be assigned)' }]
+];
+const NEUTRAL = { color: 'ededed', description: '' };
+
+function labelStyle(name) {
+  if (LABEL_STYLES[name]) return LABEL_STYLES[name];
+  const hit = PREFIX_STYLES.find(([prefix]) => String(name).startsWith(prefix));
+  return hit ? hit[1] : NEUTRAL;
+}
+
+// "[Story] Login": the kind reads in the list without relying on colour.
+const TITLE_PREFIXES = { story: '[Story]', milestone: '[Milestone]', task: '[Task]' };
+const PREFIX_RE = /^\s*\[(?:story|milestone|task)\]\s*/i;
+
+const stripPrefix = title => String(title || '').replace(PREFIX_RE, '');
+const withPrefix = (type, title) => `${TITLE_PREFIXES[type]} ${stripPrefix(title)}`;
+
 function labelNames(issue) {
   return (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
 }
@@ -95,6 +122,10 @@ module.exports = {
   BASE_LABEL,
   typeLabel,
   ownerLabel,
+  labelStyle,
+  TITLE_PREFIXES,
+  stripPrefix,
+  withPrefix,
   labelNames,
   issueType,
   issueOwner,

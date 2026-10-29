@@ -43,7 +43,7 @@ The assignee is the host account that owns the work. Default to the `gh api user
 
 Print the exact list of files and remote objects that would be created:
 
-- `.haku/config.json` (assignee, maxWorkers, mergeMode)
+- `.haku/config.json` (assignee, maxWorkers, mergeMode, titlePrefix)
 - a starter `.haku/verify.json` with profiles detected from the repository (e.g. `package.json` test script -> profile `unit` with `countPattern` and `minTests: 1`)
 - `.github/pull_request_template.md` with the Korean PR sections (요약, 이유, 변경 내용, 테스트, 위험과 영향); copy it from `${CLAUDE_PLUGIN_ROOT}/.github/pull_request_template.md` unless the repository already has one
 - the base labels (`haku`, `type:story|milestone|task`; `owner:<name>` is created only when someone cannot be assigned)

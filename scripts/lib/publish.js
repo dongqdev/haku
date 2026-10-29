@@ -1,6 +1,6 @@
 'use strict';
 
-const { BASE_LABEL, typeLabel } = require('./model');
+const { BASE_LABEL, typeLabel, withPrefix } = require('./model');
 
 const KINDS = ['T1', 'T2', 'T3'];
 
@@ -111,7 +111,7 @@ function renderBody(entry, numbers, children = []) {
 
 // state.numbers persists draftId -> issue number so an interrupted publish resumes
 // without creating duplicates.
-function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null } = {}) {
+function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null, titlePrefix = true } = {}) {
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
 
@@ -137,7 +137,8 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     // Parent line needs the parent's number, which exists because parents come first.
     let body = renderBody(e, numbers);
     if (e.type === 'story' && orchestrator) body += `\nOrchestrator: ${orchestrator}`;
-    const number = host.createIssue({ title: e.node.title, body, labels: labelsFor(e), assignee: draft.assignee });
+    const title = titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title;
+    const number = host.createIssue({ title, body, labels: labelsFor(e), assignee: draft.assignee });
     numbers.set(e.key, number);
     state.numbers[e.key] = number;
   }

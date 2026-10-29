@@ -46,6 +46,10 @@ Coming from the earlier name? See [docs/upgrading.md](docs/upgrading.md).
 
 Every task PR is written in Korean with the same sections: 요약 (what), 이유 (why), 변경 내용 (changes), 테스트 (commands run, results, what was confirmed in a real environment and what was not), 위험과 영향 (compatibility, rollback, follow-ups), and the `Closes #N` line. `issues.js pr-body --issue N` prints the skeleton and `issues.js pr-check` rejects missing or empty sections, sections without Korean prose (code and quotes do not count), and closing lines that do not match the task, including `owner/repo#N` and URL forms. Each section needs at least 5 Korean characters of prose, so a section that only lists file names in code must add a sentence. `build` runs the check before asking for merge approval.
 
+## Labels and titles
+
+haku creates its labels with fixed colours (Okabe-Ito, distinguishable for colour-vision differences): `haku` brown, `type:story` blue, `type:milestone` green, `type:task` orange, `sprint:*` purple, `owner:*` sky blue, each with a short description. Issue titles get a kind prefix, `[Story]`, `[Milestone]` or `[Task]`, so the kind reads without colour; set `"titlePrefix": false` in `.haku/config.json` to switch the prefix off. Existing labels get their colour updated the next time haku ensures them (`gh label create --force`).
+
 ## Ownership
 
 The owner of a story, milestone or task is the host's **assignee** (`assignee` in `.haku/config.json`). If the host refuses the assignment, for example because the person is not a collaborator, the issue is still created and gets an `owner:<name>` label instead.

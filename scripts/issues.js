@@ -63,6 +63,15 @@ function parse(argv) {
   return opts;
 }
 
+// .haku/config.json of the repository we run in; missing or unreadable means defaults.
+function readConfig() {
+  try {
+    return JSON.parse(fs.readFileSync('.haku/config.json', 'utf8'));
+  } catch (err) {
+    return {};
+  }
+}
+
 const out = obj => process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
 function needIssue(opts) {
@@ -88,7 +97,8 @@ function main(argv) {
         result = publish(opts.apply ? host() : null, JSON.parse(fs.readFileSync(arg1, 'utf8')), {
           apply: Boolean(opts.apply),
           state,
-          orchestrator: opts.orchestrator || null
+          orchestrator: opts.orchestrator || null,
+        titlePrefix: readConfig().titlePrefix !== false
         });
       } finally {
         // Save progress even when publish throws midway, so a retry resumes instead of duplicating.
