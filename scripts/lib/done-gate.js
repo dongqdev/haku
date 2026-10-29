@@ -25,7 +25,13 @@ function doneCheck(host, issueNumber) {
     .some(v => v.status === 'pass');
   if (!verified) missing.push('post-merge-verification');
 
-  return { ok: missing.length === 0, missing, base, pr: merged ? merged.number : null };
+  return {
+    ok: missing.length === 0,
+    missing,
+    base,
+    pr: merged ? merged.number : null,
+    prHead: merged ? merged.headRefOid || null : null
+  };
 }
 
 module.exports = { doneCheck };

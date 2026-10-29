@@ -2,12 +2,14 @@
 'use strict';
 
 const fs = require('fs');
+const { spawnSync } = require('child_process');
 const { createGitHubHost } = require('./lib/github-host');
 const { reconcile } = require('./lib/reconcile');
 const { publish } = require('./lib/publish');
 const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
+const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { readConfig, titlePrefixOn } = require('./lib/config');
 const { skeleton, checkBody } = require('./lib/pr-body');
@@ -25,7 +27,8 @@ Usage:
   issues.js done-check --issue <N> [--json]
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
   issues.js worker-list [--cwd <dir>]
-  issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon]
+  issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon] [--discard]
+  issues.js pr-state --issue <N> [--branch <name>] [--cwd <dir>]
   issues.js status [--json] [--repo <owner/repo>]
   issues.js triage [--json] [--repo <owner/repo>]
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
@@ -41,7 +44,7 @@ done-check    Exit 0 only when a worker may be deleted.
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -51,6 +54,7 @@ function parse(argv) {
     else if (arg === '--json') opts.json = true;
     else if (arg === '--trust-working-copy') opts.trust = true;
     else if (arg === '--abandon') opts.abandon = true;
+    else if (arg === '--discard') opts.discard = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else if (VALUE.has(arg)) {
       const value = argv[i + 1];
@@ -154,11 +158,23 @@ function main(argv) {
       needIssue(opts);
       const cwd = opts.cwd || process.cwd();
       if (opts.abandon) {
-        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true }));
+        out(removeWorker({ cwd, issue: opts.issue, gate: null, abandon: true, discard: Boolean(opts.discard) }));
         return 0;
       }
-      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), deleteRemote: true }));
+      out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), discard: Boolean(opts.discard), deleteRemote: true }));
       return 0;
+    }
+    case 'pr-state': {
+      needIssue(opts);
+      const cwd = opts.cwd || process.cwd();
+      const record = listWorkers(cwd).find(w => w.issue === opts.issue);
+      const branch = opts.branch || (record && record.branch);
+      if (!branch) throw new Error(`no worker record for #${opts.issue}; pass --branch <name>`);
+      const tip = spawnSync('git', ['rev-parse', '--verify', '-q', branch], { cwd, encoding: 'utf8' });
+      const result = prState(host(), branch, tip.status === 0 ? tip.stdout.trim() : null);
+      out(result);
+      // 3 = merged or closed: do not push to this branch
+      return result.safeToPush ? 0 : 3;
     }
     case 'status': {
       const s = buildStatus(host().listIssues(), listWorkers(opts.cwd || process.cwd()));

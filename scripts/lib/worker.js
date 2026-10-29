@@ -8,8 +8,10 @@ const { slugify, stripPrefix, issueType } = require('./model');
 
 const DEFAULT_MAX_WORKERS = 2;
 
+const GIT_TIMEOUT_MS = 60000;
+
 function git(cwd, args) {
-  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: GIT_TIMEOUT_MS });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr.trim()}`);
   return r.stdout.trim();
 }
@@ -62,17 +64,75 @@ function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT
   return record;
 }
 
-// gate is the result of done-gate.doneCheck. Without a passing gate nothing is deleted;
-// the only other way out is an explicit abandon, which the caller must have recorded.
-// With deleteRemote and a passing gate (merged PR), the remote task branch is deleted too; a branch the
-// host already deleted is not an error. Abandoned work keeps its remote branch.
-function removeWorker({ cwd, issue, gate, abandon = false, deleteRemote = false }) {
+const gitTry = (cwd, args) => {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: GIT_TIMEOUT_MS });
+  return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+};
+
+const list = (lines, max = 10) => {
+  const shown = lines.slice(0, max).map(l => `    ${l}`).join('\n');
+  return lines.length > max ? `${shown}\n    ... and ${lines.length - max} more` : shown;
+};
+
+// Commits of `tip` that the merged head does not contain, as "sha subject" lines. Anything that cannot
+// be checked is a refusal, never a pass: an unknown commit might be work that would be lost.
+function commitsBeyond(cwd, prHead, tip, what) {
+  if (tip === prHead) return [];
+  if (!gitTry(cwd, ['cat-file', '-e', `${tip}^{commit}`]).ok || !gitTry(cwd, ['cat-file', '-e', `${prHead}^{commit}`]).ok) {
+    throw new Error(`the ${what} (${tip.slice(0, 7)}) or the merged head (${prHead.slice(0, 7)}) is not in this repository; fetch and retry`);
+  }
+  const r = gitTry(cwd, ['log', '--format=%h %s', `${prHead}..${tip}`]);
+  if (!r.ok) throw new Error(`could not compare the ${what} with the merged head: ${r.err}`);
+  return r.out ? r.out.split('\n') : [];
+}
+
+// gate is the result of done-gate.doneCheck. Nothing is deleted without a passing gate, and even with one
+// not while the worktree holds uncommitted files or the branch holds commits the merged pull request did
+// not contain. Every check runs before the first deletion, so a refusal leaves everything in place.
+// abandon skips the gate; discard is the explicit "throw the uncommitted files away".
+// With deleteRemote and a passing gate the remote task branch is deleted too (a branch the host already
+// deleted is not an error); abandoned work keeps its remote branch.
+function removeWorker({ cwd, issue, gate, abandon = false, discard = false, deleteRemote = false }) {
   const record = listWorkers(cwd).find(w => w.issue === issue);
   if (!record) throw new Error(`no worker for #${issue}`);
   if (!abandon && !(gate && gate.ok)) {
     const missing = gate && gate.missing ? gate.missing.join(', ') : 'gate result';
     throw new Error(`refusing to delete worker #${issue}; missing: ${missing}`);
   }
+
+  const status = fs.existsSync(record.path) ? gitTry(record.path, ['status', '--porcelain']) : { ok: true, out: '' };
+  if (!status.ok) throw new Error(`refusing to delete worker #${issue}; could not read the worktree status: ${status.err}`);
+  const dirty = status.out ? status.out.split('\n') : [];
+  if (dirty.length && !discard) {
+    throw new Error(`refusing to delete worker #${issue}; ${dirty.length} uncommitted file(s) would be lost:\n${list(dirty, 20)}\n`
+      + '    commit them, or pass --discard to throw them away');
+  }
+
+  let discardedCommits = 0;
+  if (!abandon) {
+    if (!gate.prHead) throw new Error(`refusing to delete worker #${issue}; the gate did not report the merged pull request's head commit`);
+    const tip = git(cwd, ['rev-parse', record.branch]);
+    const extra = commitsBeyond(cwd, gate.prHead, tip, 'local branch');
+    if (extra.length) {
+      throw new Error(`refusing to delete worker #${issue}; ${extra.length} commit(s) on ${record.branch} came after the merged pull request and would be lost:\n${list(extra)}\n`
+        + '    put them in a follow-up pull request first');
+    }
+    if (deleteRemote && /^task\//.test(record.branch)) {
+      const remote = gitTry(cwd, ['ls-remote', '--heads', 'origin', record.branch]);
+      if (!remote.ok) throw new Error(`refusing to delete worker #${issue}; could not read the remote branch: ${remote.err}`);
+      const remoteTip = remote.out.split(/\s+/)[0];
+      if (remoteTip) {
+        const beyond = commitsBeyond(cwd, gate.prHead, remoteTip, 'remote branch');
+        if (beyond.length) {
+          throw new Error(`refusing to delete worker #${issue}; ${beyond.length} commit(s) on origin/${record.branch} came after the merged pull request:\n${list(beyond)}`);
+        }
+      }
+    }
+  } else {
+    const count = gitTry(cwd, ['rev-list', '--count', `${record.base}..${record.branch}`]);
+    discardedCommits = count.ok ? Number(count.out) : 0;
+  }
+
   git(cwd, ['worktree', 'remove', '--force', record.path]);
   // Squash/rebase merges leave the branch unmerged from git's point of view, hence -D.
   git(cwd, ['branch', '-D', record.branch]);
@@ -81,7 +141,7 @@ function removeWorker({ cwd, issue, gate, abandon = false, deleteRemote = false 
   if (deleteRemote && !abandon && /^task\//.test(record.branch)) {
     remoteBranchDeleted = spawnSync('git', ['push', 'origin', '--delete', record.branch], { cwd, encoding: 'utf8' }).status === 0;
   }
-  return { ...record, remoteBranchDeleted };
+  return { ...record, remoteBranchDeleted, discarded: { commits: discardedCommits, files: dirty.length } };
 }
 
 module.exports = { startWorker, removeWorker, listWorkers, workerRoot, DEFAULT_MAX_WORKERS };

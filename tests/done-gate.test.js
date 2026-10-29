@@ -14,13 +14,13 @@ function host({ state = 'closed', prs = [], comments = [] } = {}) {
   };
 }
 
-const mergedPr = { number: 9, body: '', headRefName: 'task/5-x', closingIssues: [] };
+const mergedPr = { number: 9, body: '', headRefName: 'task/5-x', headRefOid: 'abc1234def', closingIssues: [] };
 const summary = `${SUMMARY_MARKER}\nwhat I did`;
 const passed = verifiedMarker({ kind: 'T1', status: 'pass', sha: 'abc' });
 
 test('all four conditions met -> worker may be deleted', () => {
   const r = doneCheck(host({ prs: [mergedPr], comments: [summary, passed] }), 5);
-  assert.deepStrictEqual(r, { ok: true, missing: [], base: 'main', pr: 9 });
+  assert.deepStrictEqual(r, { ok: true, missing: [], base: 'main', pr: 9, prHead: 'abc1234def' });
 });
 
 test('each missing condition is reported separately', () => {
