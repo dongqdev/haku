@@ -247,3 +247,19 @@ test('closeForTriage closes nothing it must not: unknown, closed, planned, story
   assert.throws(() => closeForTriage(host, 4, '   '), /reason is required/);
   assert.deepStrictEqual(host.closed, []);
 });
+
+test('getIssue returns the url, lowercases the state and keeps label objects', () => {
+  const exec = () => JSON.stringify({ number: 9, title: 't', body: null, state: 'OPEN', url: 'https://github.com/o/r/issues/9', labels: [{ name: 'haku', color: 'x' }] });
+  const i = createGitHubHost({ repo: 'o/r', exec }).getIssue(9);
+  assert.strictEqual(i.state, 'open');
+  assert.strictEqual(i.url, 'https://github.com/o/r/issues/9');
+  assert.strictEqual(i.labels[0].name, 'haku');
+});
+
+test('the build skill explains the reconcile warnings that hold a parent back', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const build = fs.readFileSync(path.join(__dirname, '..', 'skills', 'build', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(build, /`child-not-listed` or `child-not-done`/);
+  assert.match(build, /never close such a parent by hand/);
+});

@@ -137,6 +137,19 @@ test('start refuses an unknown or unreadable issue and one that is not a haku is
   const { repo, home } = setup();
   const host = fakeHost([{ number: 9, state: 'open', labels: [{ name: 'bug' }] }]);
   assert.throws(() => startWorker({ cwd: repo, issue: 404, title: 'x', base: 'main', home, host }), /issue #404 not found or not readable: Could not resolve to an issue/);
-  assert.throws(() => startWorker({ cwd: repo, issue: 9, title: 'x', base: 'main', home, host }), /issue #9 is not a task \(type: none\)/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 9, title: 'x', base: 'main', home, host }), /issue #9 is not a haku issue/);
   assert.strictEqual(listWorkers(repo).length, 0);
+});
+
+test('start refuses a pull request and an issue that is not a haku issue, even with a type label', () => {
+  const { repo, home } = setup();
+  const labels = names => names.map(name => ({ name }));
+  const host = fakeHost([
+    { number: 50, state: 'open', url: 'https://github.com/o/r/pull/50', labels: labels(['haku', 'type:task']) },
+    { number: 51, state: 'open', url: 'https://github.com/o/r/issues/51', labels: labels(['type:task']) },
+    { number: 52, state: 'open', url: 'https://github.com/o/r/issues/52', labels: labels(['haku', 'type:task']) }
+  ]);
+  assert.throws(() => startWorker({ cwd: repo, issue: 50, title: 'x', base: 'main', home, host }), /#50 is a pull request/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 51, title: 'x', base: 'main', home, host }), /issue #51 is not a haku issue/);
+  assert.strictEqual(startWorker({ cwd: repo, issue: 52, title: 'x', base: 'main', home, host }).issue, 52);
 });

@@ -161,3 +161,43 @@ test('once the list shows every child named by the checklist the roll-up goes ah
   const host = { defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => [], closeIssue: () => {} };
   assert.deepStrictEqual(reconcile(host, {}).plan.map(p => [p.kind, p.issue]), [['rollup', 2]]);
 });
+
+// ---- findings of the review: only the Children section counts, and open named children hold the parent back
+test('a task list outside the Children section names no child and does not hold a parent back', () => {
+  const issue = (number, type, state, body = '') => ({ number, state, body, title: `t${number}`, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
+  const issues = [
+    issue(1, 'story', 'open', 'Track:\n- [ ] #99 upstream bug in another project\n\n## Children\n- [ ] #2 M'),
+    issue(2, 'milestone', 'closed', 'Parent: #1')
+  ];
+  const host = { defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => [], closeIssue: () => {} };
+  const r = reconcile(host, {});
+  assert.deepStrictEqual(r.plan.map(p => [p.kind, p.issue]), [['rollup', 1]]);
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind.startsWith('child-')), []);
+});
+
+test('the Children section is read in its own boundaries and forms', () => {
+  assert.deepStrictEqual(checklistNumbers({ body: 'intro\r\n## Children\r\n- [ ] #4 a\r\n* [x] #5 b\r\n+ [ ] #6 c\r\n\t- [ ] #7 nested\r\n## Notes\r\n- [ ] #8 not a child\r\n' }), [4, 5, 6, 7]);
+  assert.deepStrictEqual(checklistNumbers({ body: '## Children\n<!--\n- [ ] #4 hidden\n-->\n~~~\n- [ ] #5 fenced\n~~~\n- [ ] #6 real\n' }), [6]);
+  assert.deepStrictEqual(checklistNumbers({ body: '- [ ] #4 no section at all' }), []);
+  assert.deepStrictEqual(checklistNumbers({ body: '### Children\n- [ ] #4 third level heading\n' }), [4]);
+});
+
+test('a visible, still open child named by the checklist holds the parent back even without a Parent line', () => {
+  const issue = (number, type, state, body = '') => ({ number, state, body, title: `t${number}`, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
+  const issues = [
+    issue(2, 'milestone', 'open', '## Children\n- [ ] #3 closed child\n- [ ] #4 open child added by hand'),
+    issue(3, 'task', 'closed', 'Parent: #2'),
+    issue(4, 'task', 'open', 'no Parent line here')
+  ];
+  const host = { defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => [], closeIssue: () => assert.fail('must not close') };
+  const r = reconcile(host, { apply: true });
+  assert.deepStrictEqual(r.plan, []);
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind === 'child-not-done'), [{ kind: 'child-not-done', issue: 2, children: [4] }]);
+});
+
+test('the text report names the children that hold a parent back', () => {
+  const { describeWarning } = require('../scripts/lib/reconcile');
+  assert.strictEqual(describeWarning({ kind: 'child-not-listed', issue: 2, children: [4, 7] }), 'child-not-listed #2 (children: #4, #7)');
+  assert.strictEqual(describeWarning({ kind: 'pr-without-issue', pr: 9 }), 'pr-without-issue PR #9');
+  assert.strictEqual(describeWarning({ kind: 'closed-without-merged-pr', issue: 5 }), 'closed-without-merged-pr #5');
+});

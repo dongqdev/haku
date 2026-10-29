@@ -55,7 +55,6 @@ function reconcile(host, { apply = false } = {}) {
   }
 
   const byNumber = new Map(issues.map(i => [i.number, i]));
-  const warnedUnseen = new Set();
   const isDone = issue => issue.state === 'closed' || planned.has(issue.number);
   let changed = true;
   while (changed) {
@@ -68,12 +67,16 @@ function reconcile(host, { apply = false } = {}) {
       if (kids.length === 0 || !kids.every(isDone)) continue;
       // The list can lag behind a child created moments ago. A child the parent's own checklist names but the
       // list does not show may still be open, so the parent is not rolled up on this read.
-      const unseen = checklistNumbers(issue).filter(n => !byNumber.has(n));
+      const named = checklistNumbers(issue);
+      const unseen = named.filter(n => !byNumber.has(n));
       if (unseen.length) {
-        if (!warnedUnseen.has(issue.number)) {
-          warnedUnseen.add(issue.number);
-          warnings.push({ kind: 'child-not-listed', issue: issue.number, children: unseen });
-        }
+        warnings.push({ kind: 'child-not-listed', issue: issue.number, children: unseen });
+        continue;
+      }
+      // A child the checklist names and the list shows, still open although it carries no Parent line of its own.
+      const open = named.filter(n => !isDone(byNumber.get(n)));
+      if (open.length) {
+        warnings.push({ kind: 'child-not-done', issue: issue.number, children: open });
         continue;
       }
       planned.add(issue.number);
@@ -103,4 +106,12 @@ function reconcile(host, { apply = false } = {}) {
   return { base, plan, warnings, applied, dryRun: !apply };
 }
 
-module.exports = { reconcile };
+// One line of the text report for a warning; children, when there are any, are named so nobody has to
+// run --json to learn which issue holds a parent back.
+function describeWarning(w) {
+  const subject = w.issue ? `#${w.issue}` : `PR #${w.pr}`;
+  const children = w.children ? ` (children: ${w.children.map(n => `#${n}`).join(', ')})` : '';
+  return `${w.kind} ${subject}${children}`;
+}
+
+module.exports = { reconcile, describeWarning };

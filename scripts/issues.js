@@ -4,7 +4,7 @@
 const fs = require('fs');
 const { spawnSync } = require('child_process');
 const { createGitHubHost } = require('./lib/github-host');
-const { reconcile } = require('./lib/reconcile');
+const { reconcile, describeWarning } = require('./lib/reconcile');
 const { publish } = require('./lib/publish');
 const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
@@ -111,7 +111,7 @@ function main(argv) {
       else {
         console.log(`reconcile against ${result.base}: ${result.dryRun ? 'dry-run (nothing closed)' : 'applied'}`);
         for (const p of result.plan) console.log(`  close #${p.issue}  [${p.kind}] ${p.reason}`);
-        for (const w of result.warnings) console.log(`  warn  ${w.kind} ${w.issue ? `#${w.issue}` : `PR #${w.pr}`}`);
+        for (const w of result.warnings) console.log(`  warn  ${describeWarning(w)}`);
         if (!result.plan.length && !result.warnings.length) console.log('  nothing to do');
       }
       return 0;

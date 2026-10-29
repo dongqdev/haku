@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { slugify, stripPrefix, issueType } = require('./model');
+const { slugify, stripPrefix, issueType, labelNames, BASE_LABEL } = require('./model');
 
 const DEFAULT_MAX_WORKERS = 2;
 
@@ -46,6 +46,9 @@ function assertTaskIssue(host, issue) {
     throw new Error(`issue #${issue} not found or not readable: ${String(err.message).split('\n')[0]}`);
   }
   if (!found) throw new Error(`issue #${issue} not found`);
+  // `gh issue view` also answers for pull requests and for issues of other tools: only a haku issue is work.
+  if (/\/pull\/\d+/.test(String(found.url || ''))) throw new Error(`#${issue} is a pull request, not an issue`);
+  if (!labelNames(found).includes(BASE_LABEL)) throw new Error(`issue #${issue} is not a haku issue (no "${BASE_LABEL}" label)`);
   if (issueType(found) !== 'task') throw new Error(`issue #${issue} is not a task (type: ${issueType(found) || 'none'})`);
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
 }

@@ -96,7 +96,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
 
     // One issue by number (not through the list, which lags right after creation).
     getIssue(number) {
-      const i = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'number,title,body,state,labels,assignees']));
+      const i = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'number,title,body,state,labels,assignees,url']));
       return { ...i, state: String(i.state).toLowerCase() };
     },
 
