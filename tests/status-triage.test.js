@@ -206,14 +206,18 @@ test('the host closes triage issues as "not planned" and merged work as "complet
   assert.deepStrictEqual(reasons, ['not planned', 'completed']);
 });
 
-test('the host reads the whole open backlog and one issue by number', () => {
-  const { exec, calls } = fakeExec({
-    'issue list': JSON.stringify([{ number: 1, title: 't', body: '', state: 'OPEN', labels: [] }]),
-    'issue view': JSON.stringify({ number: 2, title: 't', body: '', state: 'CLOSED', labels: [] })
-  });
+test('the host reads the whole open backlog (no label filter) and one issue by number', () => {
+  const calls = [];
+  const exec = (bin, args) => {
+    calls.push(args);
+    if (args[0] === 'api') return JSON.stringify([{ number: 1, title: 't', body: null, state: 'open', labels: [], assignees: [] }]);
+    return JSON.stringify({ number: 2, title: 't', body: '', state: 'CLOSED', labels: [] });
+  };
   const host = createGitHubHost({ repo: 'o/r', exec });
-  assert.strictEqual(host.listBacklog()[0].state, 'open');
-  assert.ok(!calls[0].includes('--label'), 'the backlog must not be limited to labelled issues');
+  const backlog = host.listBacklog();
+  assert.strictEqual(backlog[0].state, 'open');
+  assert.strictEqual(backlog[0].body, '');
+  assert.ok(!calls[0].join(' ').includes('labels='), 'the backlog must not be limited to labelled issues');
   assert.strictEqual(host.getIssue(2).state, 'closed');
 });
 

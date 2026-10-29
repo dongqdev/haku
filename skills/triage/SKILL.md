@@ -19,6 +19,6 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 2. For each candidate, read the issues before judging. Propose one action per row with a one-line reason: keep, close as duplicate of #N, or close as obsolete (and what made it obsolete).
 3. Ask for confirmation with choice questions, at most four rows per question, every row showing the issue number, title and proposed action. Nothing is applied from a "looks fine" or silence.
 4. Apply only confirmed rows: `issues.js issue-close --issue N --reason "<why>"`. The reason is required and is written on the issue.
-5. Run `issues.js triage` again and show the result so the user sees what changed. If the list looks cut off, stop and say so.
+5. Run `issues.js triage` again and show the result so the user sees what changed. If the command reports that a list could not be read completely ("refusing to decide on a partial list"), stop and say so.
 
 Closing an issue by hand leaves it without a merged pull request. Say this once in the report: later roll-ups can flag such an issue as closed without evidence, which is expected for triage closes.
