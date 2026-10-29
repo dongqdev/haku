@@ -31,6 +31,7 @@ Print the exact list of files and remote objects that would be created:
 
 - `.ecc-harness/config.json` (assignee, maxWorkers, mergeMode)
 - a starter `.ecc-harness/verify.json` with profiles detected from the repository (e.g. `package.json` test script -> profile `unit` with `countPattern` and `minTests: 1`)
+- `.github/pull_request_template.md` with the Korean PR sections (요약, 이유, 변경 내용, 테스트, 위험과 영향); copy it from `${CLAUDE_PLUGIN_ROOT}/.github/pull_request_template.md` unless the repository already has one
 - the base labels (`ecc-harness`, `type:story|milestone|task`; `owner:<name>` is created only when someone cannot be assigned)
 
 Rules for the apply step:

@@ -9,6 +9,7 @@ const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
+const { skeleton, checkBody } = require('./lib/pr-body');
 
 const HELP = `ecc-harness issues
 
@@ -23,6 +24,7 @@ Usage:
   issues.js worker-list [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon]
   issues.js pr-body --issue <N>
+  issues.js pr-check --issue <N> --file <body.md>
   issues.js branch --issue <N> --title <text>
 
 publish       Dry-run by default; --apply creates the story/milestone/task issues.
@@ -146,8 +148,20 @@ function main(argv) {
     }
     case 'pr-body':
       needIssue(opts);
-      console.log(`Closes #${opts.issue}`);
+      process.stdout.write(skeleton(opts.issue));
       return 0;
+    case 'pr-check': {
+      needIssue(opts);
+      if (!opts.file) throw new Error('--file <body.md> is required');
+      const result = checkBody(fs.readFileSync(opts.file, 'utf8'), opts.issue);
+      if (opts.json) out(result);
+      else if (result.ok) console.log(`#${opts.issue}: PR 본문 점검 통과`);
+      else {
+        console.log(`#${opts.issue}: PR 본문 점검 실패`);
+        for (const p of result.problems) console.log(`  - ${p}`);
+      }
+      return result.ok ? 0 : 1;
+    }
     case 'branch':
       needIssue(opts);
       console.log(`task/${opts.issue}-${slugify(opts.title)}`);
