@@ -11,6 +11,38 @@ const typeLabel = type => `type:${type}`;
 // who cannot be assigned (for example, not a collaborator on the repository).
 const ownerLabel = name => `owner:${name}`;
 
+// Label colours and descriptions. The hues follow the Okabe-Ito palette (distinguishable with colour-vision
+// differences), darkened so GitHub shows white label text: it picks white when the perceived lightness
+// (0.2126 R + 0.7152 G + 0.0722 B, channels 0-1) is below 0.453. The base label's brown is the mascot's own
+// colour. Unknown labels stay grey.
+const LABEL_STYLES = {
+  [BASE_LABEL]: { color: '6F4E37', description: 'Managed by haku' },
+  [typeLabel('story')]: { color: '0072B2', description: 'Story: a big goal' },
+  [typeLabel('milestone')]: { color: '007A5A', description: 'Milestone: a stage of a story' },
+  [typeLabel('task')]: { color: 'C75B00', description: 'Task: what one worker does' }
+};
+const PREFIX_STYLES = [
+  ['sprint:', { color: 'A24B7D', description: 'Sprint' }],
+  ['owner:', { color: '5A6B7B', description: 'Owner (could not be assigned)' }]
+];
+const NEUTRAL = { color: 'ededed', description: '' };
+
+function labelStyle(name) {
+  if (LABEL_STYLES[name]) return LABEL_STYLES[name];
+  const hit = PREFIX_STYLES.find(([prefix]) => String(name).startsWith(prefix));
+  return hit ? hit[1] : NEUTRAL;
+}
+
+// "[Story] Login": the kind reads in the list without relying on colour.
+const TITLE_PREFIXES = { story: '[Story]', milestone: '[Milestone]', task: '[Task]' };
+const ANY_PREFIX_RE = /^\s*\[(?:story|milestone|task)\]\s*/i;
+const ownPrefixRe = type => new RegExp(`^\\s*\\[${type}\\]\\s*`, 'i');
+
+// Removes any kind prefix (used to compare and to name branches).
+const stripPrefix = title => String(title || '').replace(ANY_PREFIX_RE, '');
+// Adds this kind's prefix once. A prefix of another kind is the author's own text and is kept.
+const withPrefix = (type, title) => `${TITLE_PREFIXES[type]} ${String(title || '').replace(ownPrefixRe(type), '')}`;
+
 function labelNames(issue) {
   return (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
 }
@@ -95,6 +127,10 @@ module.exports = {
   BASE_LABEL,
   typeLabel,
   ownerLabel,
+  labelStyle,
+  TITLE_PREFIXES,
+  stripPrefix,
+  withPrefix,
   labelNames,
   issueType,
   issueOwner,

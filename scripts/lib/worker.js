@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { slugify, issueType } = require('./model');
+const { slugify, stripPrefix, issueType } = require('./model');
 
 const DEFAULT_MAX_WORKERS = 2;
 
@@ -50,7 +50,7 @@ function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT
     throw new Error(`worker limit reached (${existing.length}/${maxWorkers}); finish or remove one first`);
   }
   const repoName = path.basename(git(cwd, ['rev-parse', '--show-toplevel'])).slice(0, 12);
-  const branch = `task/${issue}-${slugify(title)}`;
+  const branch = `task/${issue}-${slugify(stripPrefix(title))}`;
   const dir = path.join(workerRoot(home), `${repoName}-${issue}`);
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   git(cwd, ['worktree', 'add', '-b', branch, dir, base]);

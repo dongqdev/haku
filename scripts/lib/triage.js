@@ -1,6 +1,6 @@
 'use strict';
 
-const { issueType, parentOf } = require('./model');
+const { issueType, parentOf, stripPrefix } = require('./model');
 
 const normalize = text => String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -43,7 +43,7 @@ function buildTriage(openIssues) {
       if (numbers.length > 1 && !seen.has(id)) { seen.add(id); groups.push({ reason, issues: numbers }); }
     }
   };
-  group('같은 제목', i => normalize(i.title));
+  group('같은 제목', i => normalize(stripPrefix(i.title)));
   group('본문의 첫 문장이 같음', i => firstSentence(i.body));
 
   return { backlog, duplicates: groups };

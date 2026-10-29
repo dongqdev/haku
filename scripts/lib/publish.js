@@ -1,6 +1,9 @@
 'use strict';
 
-const { BASE_LABEL, typeLabel } = require('./model');
+const { BASE_LABEL, typeLabel, withPrefix, stripPrefix } = require('./model');
+
+// GitHub rejects titles over 256 characters; the prefix adds up to 12, so a draft title may use 244.
+const MAX_TITLE = 244;
 
 const KINDS = ['T1', 'T2', 'T3'];
 
@@ -14,6 +17,13 @@ function validateDraft(draft) {
 
   need(draft && typeof draft.assignee === 'string' && draft.assignee.trim(), 'assignee is required (the host login that owns this story)');
   need(draft && draft.story && draft.story.title, 'story.title is required');
+  // A title must say something besides a kind prefix, and must still fit once the prefix is added.
+  const checkTitle = (where, title) => {
+    if (!title) return;
+    need(stripPrefix(title).trim().length > 0, `${where}: title is empty after the kind prefix`);
+    need(String(title).length <= MAX_TITLE, `${where}: title is longer than ${MAX_TITLE} characters`);
+  };
+  if (draft && draft.story) checkTitle('story', draft.story.title);
   need(draft && Array.isArray(draft.milestones) && draft.milestones.length > 0, 'at least one milestone is required');
   if (errors.length) return errors;
 
@@ -39,6 +49,7 @@ function validateDraft(draft) {
   for (const m of draft.milestones) {
     uniq(`milestone ${m.id || '?'}`, m.id);
     need(m.title, `milestone ${m.id}: title is required`);
+    checkTitle(`milestone ${m.id}`, m.title);
     checkVerify(`milestone ${m.id}`, m.verify);
     need(Array.isArray(m.tasks) && m.tasks.length > 0, `milestone ${m.id}: needs at least one task`);
     for (const t of m.tasks || []) {
@@ -46,6 +57,7 @@ function validateDraft(draft) {
       uniq(where, t.id);
       taskIds.add(t.id);
       need(t.title, `${where}: title is required`);
+      checkTitle(where, t.title);
       need(Array.isArray(t.acceptance) && t.acceptance.length > 0, `${where}: acceptance criteria are required`);
       need(Array.isArray(t.scope) && t.scope.length > 0, `${where}: scope (files this task may touch) is required`);
       checkVerify(where, t.verify);
@@ -111,7 +123,7 @@ function renderBody(entry, numbers, children = []) {
 
 // state.numbers persists draftId -> issue number so an interrupted publish resumes
 // without creating duplicates.
-function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null } = {}) {
+function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null, titlePrefix = true } = {}) {
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
 
@@ -120,7 +132,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   const plan = entries.map(e => ({
     key: e.key,
     type: e.type,
-    title: e.node.title,
+    title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));
   if (!apply) return { ok: true, dryRun: true, plan, errors: [] };
@@ -137,7 +149,8 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     // Parent line needs the parent's number, which exists because parents come first.
     let body = renderBody(e, numbers);
     if (e.type === 'story' && orchestrator) body += `\nOrchestrator: ${orchestrator}`;
-    const number = host.createIssue({ title: e.node.title, body, labels: labelsFor(e), assignee: draft.assignee });
+    const title = titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title;
+    const number = host.createIssue({ title, body, labels: labelsFor(e), assignee: draft.assignee });
     numbers.set(e.key, number);
     state.numbers[e.key] = number;
   }
