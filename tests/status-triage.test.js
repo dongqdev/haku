@@ -248,8 +248,13 @@ test('closeForTriage closes nothing it must not: unknown, closed, planned, story
   assert.deepStrictEqual(host.closed, []);
 });
 
-test('getIssue returns the url, lowercases the state and keeps label objects', () => {
-  const exec = () => JSON.stringify({ number: 9, title: 't', body: null, state: 'OPEN', url: 'https://github.com/o/r/issues/9', labels: [{ name: 'haku', color: 'x' }] });
+test('getIssue asks for the url (the real gh answers only the fields it is asked for), lowercases the state and keeps label objects', () => {
+  const everything = { number: 9, title: 't', body: null, state: 'OPEN', url: 'https://github.com/o/r/issues/9', labels: [{ name: 'haku', color: 'x' }], assignees: [] };
+  // like gh: only the requested --json fields come back
+  const exec = (bin, args) => {
+    const wanted = args[args.indexOf('--json') + 1].split(',');
+    return JSON.stringify(Object.fromEntries(wanted.map(k => [k, everything[k]])));
+  };
   const i = createGitHubHost({ repo: 'o/r', exec }).getIssue(9);
   assert.strictEqual(i.state, 'open');
   assert.strictEqual(i.url, 'https://github.com/o/r/issues/9');

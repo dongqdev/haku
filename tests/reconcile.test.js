@@ -201,3 +201,50 @@ test('the text report names the children that hold a parent back', () => {
   assert.strictEqual(describeWarning({ kind: 'pr-without-issue', pr: 9 }), 'pr-without-issue PR #9');
   assert.strictEqual(describeWarning({ kind: 'closed-without-merged-pr', issue: 5 }), 'closed-without-merged-pr #5');
 });
+
+// ---- the report must agree with the plan, and say each hold once
+const mk = (number, type, state, body = '') => ({ number, state, body, title: `t${number}`, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
+const hostOf = (issues, prs = []) => ({ defaultBranch: () => 'main', listIssues: () => issues, listMergedPrs: () => prs, closeIssue: () => {} });
+
+test('a parent held back in one pass but rolled up in a later pass is not reported as held back', () => {
+  // story 1 names milestone 2 and 3; milestone 2 has no Parent line and is rolled up in the same run
+  const issues = [
+    mk(1, 'story', 'open', '## Children\n- [ ] #2 M2\n- [ ] #3 M3'),
+    mk(3, 'milestone', 'closed', 'Parent: #1'),
+    mk(2, 'milestone', 'open', '## Children\n- [ ] #4 t'),
+    mk(4, 'task', 'closed', 'Parent: #2')
+  ];
+  const r = reconcile(hostOf(issues), {});
+  assert.deepStrictEqual(r.plan.map(p => [p.kind, p.issue]), [['rollup', 2], ['rollup', 1]]);
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind.startsWith('child-')), [], 'no hold for a parent that is closed by this very plan');
+});
+
+test('a parent that stays held back is reported exactly once, however many passes the roll-up needs', () => {
+  const issues = [
+    mk(1, 'story', 'open', '## Children\n- [ ] #2 done\n- [ ] #77 not listed yet'),
+    mk(2, 'milestone', 'closed', 'Parent: #1'),
+    mk(10, 'story', 'open', '## Children\n- [ ] #11 m'),
+    mk(11, 'milestone', 'open', '## Children\n- [ ] #12 t\n\nParent: #10'),
+    mk(12, 'task', 'closed', 'Parent: #11')
+  ];
+  const r = reconcile(hostOf(issues), {});
+  assert.deepStrictEqual(r.plan.map(p => p.issue), [11, 10], 'the two-level roll-up needs a second pass');
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind === 'child-not-listed'), [{ kind: 'child-not-listed', issue: 1, children: [77] }]);
+});
+
+test('a child that this run is about to close counts as done for the checklist guard', () => {
+  const issues = [
+    mk(2, 'milestone', 'open', '## Children\n- [ ] #3 closed child\n- [ ] #4 merged but still open'),
+    mk(3, 'task', 'closed', 'Parent: #2'),
+    mk(4, 'task', 'open', 'no Parent line')
+  ];
+  const prs = [{ number: 9, body: 'Closes #4', headRefName: 'task/4-x', closingIssues: [4] }];
+  const r = reconcile(hostOf(issues, prs), {});
+  assert.deepStrictEqual(r.plan.map(p => [p.kind, p.issue]), [['merged-not-closed', 4], ['rollup', 2]]);
+  assert.deepStrictEqual(r.warnings.filter(w => w.kind.startsWith('child-')), []);
+});
+
+test('the Children heading is found in any letter case', () => {
+  assert.deepStrictEqual(checklistNumbers({ body: '## children\n- [ ] #4 a\n' }), [4]);
+  assert.deepStrictEqual(checklistNumbers({ body: '## CHILDREN\n- [ ] #5 a\n' }), [5]);
+});

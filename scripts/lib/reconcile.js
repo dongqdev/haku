@@ -55,6 +55,9 @@ function reconcile(host, { apply = false } = {}) {
   }
 
   const byNumber = new Map(issues.map(i => [i.number, i]));
+  // Parents held back by the checklist guard. The loop below runs until nothing changes, so a hold is only
+  // reported once it is final: a parent that is rolled up in a later pass is not held back after all.
+  const holds = new Map();
   const isDone = issue => issue.state === 'closed' || planned.has(issue.number);
   let changed = true;
   while (changed) {
@@ -70,15 +73,16 @@ function reconcile(host, { apply = false } = {}) {
       const named = checklistNumbers(issue);
       const unseen = named.filter(n => !byNumber.has(n));
       if (unseen.length) {
-        warnings.push({ kind: 'child-not-listed', issue: issue.number, children: unseen });
+        holds.set(issue.number, { kind: 'child-not-listed', issue: issue.number, children: unseen });
         continue;
       }
       // A child the checklist names and the list shows, still open although it carries no Parent line of its own.
       const open = named.filter(n => !isDone(byNumber.get(n)));
       if (open.length) {
-        warnings.push({ kind: 'child-not-done', issue: issue.number, children: open });
+        holds.set(issue.number, { kind: 'child-not-done', issue: issue.number, children: open });
         continue;
       }
+      holds.delete(issue.number);
       planned.add(issue.number);
       plan.push({
         kind: 'rollup',
@@ -87,6 +91,10 @@ function reconcile(host, { apply = false } = {}) {
       });
       changed = true;
     }
+  }
+
+  for (const hold of holds.values()) {
+    if (!planned.has(hold.issue)) warnings.push(hold);
   }
 
   for (const issue of issues) {
