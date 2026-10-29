@@ -1,0 +1,54 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+const { SECTIONS, skeleton, checkBody } = require('../scripts/lib/pr-body');
+
+const filled = (issue = 3, over = {}) => {
+  const text = {
+    '요약': '스킬 이름을 setup, plan, build로 바꿉니다.',
+    '이유': '시험 사용자가 이름이 직관적이지 않다고 했습니다.',
+    '변경 내용': '스킬 폴더와 README의 참조를 모두 맞췄습니다.',
+    '테스트': '로컬 48개 통과, 3개 OS CI 통과, 실제 GitHub에서 확인했습니다.',
+    '위험과 영향': '기존 초안의 rail 필드는 오류가 납니다. 사용하는 저장소는 아직 없습니다.',
+    ...over
+  };
+  return `${SECTIONS.map(n => `## ${n}\n${text[n]}\n`).join('\n')}\n## 닫히는 이슈\nCloses #${issue}\n`;
+};
+
+test('the skeleton lists every section and the closing line but is not acceptable as is', () => {
+  const s = skeleton(7);
+  for (const n of SECTIONS) assert.match(s, new RegExp(`## ${n}`));
+  assert.match(s, /Closes #7/);
+  const r = checkBody(s, 7);
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.problems.filter(p => /비어 있습니다/.test(p)).length, SECTIONS.length);
+});
+
+test('a complete Korean body that closes its own task passes', () => {
+  assert.deepStrictEqual(checkBody(filled(3), 3), { ok: true, problems: [] });
+});
+
+test('a missing section is reported', () => {
+  const body = filled(3).replace(/## 테스트[\s\S]*?(?=## 위험)/, '');
+  assert.match(checkBody(body, 3).problems.join('\n'), /"## 테스트" 항목이 없습니다/);
+});
+
+test('an empty section is reported', () => {
+  assert.match(checkBody(filled(3, { '이유': '  ' }), 3).problems.join('\n'), /"## 이유" 항목이 비어 있습니다/);
+});
+
+test('an English-only body is rejected', () => {
+  const english = Object.fromEntries(SECTIONS.map(n => [n, 'Renames the skills and updates every reference in the docs.']));
+  assert.match(checkBody(filled(3, english), 3).problems.join('\n'), /한글/);
+});
+
+test('the closing line must name this task and nothing else', () => {
+  assert.match(checkBody(filled(4), 3).problems.join('\n'), /Closes #3.*없습니다/);
+  assert.match(checkBody(`${filled(3)}\nFixes #9\n`, 3).problems.join('\n'), /#9/);
+});
+
+test('a closing line inside a code fence does not count', () => {
+  const body = filled(3).replace('Closes #3', '```\nCloses #3\n```');
+  assert.match(checkBody(body, 3).problems.join('\n'), /Closes #3.*없습니다/);
+});
