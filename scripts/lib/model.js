@@ -74,6 +74,22 @@ function dependsOn(issue) {
   return [...refs.matchAll(/(?<![\w/])#(\d+)/g)].map(x => Number(x[1]));
 }
 
+// The numbers in a parent's "## Children" checklist ("- [ ] #12 title"), as publish writes them. Only that
+// section counts: a task list elsewhere in the body ("- [ ] #99 upstream bug") names no child. Comments, code
+// and quotes are ignored like everywhere else a body is read.
+function checklistNumbers(issue) {
+  const body = stripNonClaims(issue.body)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '');
+  const lines = body.split(/\r?\n/);
+  const start = lines.findIndex(l => /^#{1,6}\s*Children\s*$/i.test(l.trim()));
+  if (start === -1) return [];
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex(l => /^#{1,6}\s/.test(l.trim()));
+  const section = (end === -1 ? rest : rest.slice(0, end)).join('\n');
+  return [...section.matchAll(/^\s*[-*+]\s*\[[ xX]\]\s*#(\d+)\b/gm)].map(m => Number(m[1]));
+}
+
 function parentOf(issue) {
   const m = stripNonClaims(issue.body).match(/^Parent:\s*#(\d+)\s*$/im);
   return m ? Number(m[1]) : null;
@@ -135,6 +151,7 @@ module.exports = {
   issueType,
   issueOwner,
   parentOf,
+  checklistNumbers,
   dependsOn,
   closingRefsFromText,
   issueFromBranch,

@@ -246,7 +246,7 @@ test('with several merged pull requests for one issue the newest decides, whatev
   ];
   const comments = [{ body: '<!-- haku:worker-summary -->' }, { body: '<!-- haku:verified kind=T1 status=pass sha=abc -->' }];
   for (const order of [prs, [...prs].reverse()]) {
-    const host = { defaultBranch: () => 'main', listIssues: () => [{ number: 5, state: 'closed', labels: [] }], listMergedPrs: () => order, listComments: () => comments };
+    const host = { defaultBranch: () => 'main', getIssue: () => ({ number: 5, state: 'closed', labels: [] }), listMergedPrs: () => order, listComments: () => comments };
     const r = doneCheck(host, 5);
     assert.deepStrictEqual([r.pr, r.prHead], [40, 'newer']);
   }

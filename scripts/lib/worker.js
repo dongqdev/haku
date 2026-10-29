@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { slugify, stripPrefix, issueType } = require('./model');
+const { slugify, stripPrefix, issueType, labelNames, BASE_LABEL } = require('./model');
 
 const DEFAULT_MAX_WORKERS = 2;
 
@@ -37,9 +37,18 @@ function listWorkers(cwd) {
 }
 
 // With a host, the issue must exist, be open and be a task: workers never own stories or milestones.
+// The issue is read by its number, not through the list: a list can lag for seconds after an issue is created.
 function assertTaskIssue(host, issue) {
-  const found = host.listIssues().find(i => i.number === issue);
-  if (!found) throw new Error(`issue #${issue} not found among haku issues`);
+  let found;
+  try {
+    found = host.getIssue(issue);
+  } catch (err) {
+    throw new Error(`issue #${issue} not found or not readable: ${String(err.message).split('\n')[0]}`);
+  }
+  if (!found) throw new Error(`issue #${issue} not found`);
+  // `gh issue view` also answers for pull requests and for issues of other tools: only a haku issue is work.
+  if (/\/pull\/\d+/.test(String(found.url || ''))) throw new Error(`#${issue} is a pull request, not an issue`);
+  if (!labelNames(found).includes(BASE_LABEL)) throw new Error(`issue #${issue} is not a haku issue (no "${BASE_LABEL}" label)`);
   if (issueType(found) !== 'task') throw new Error(`issue #${issue} is not a task (type: ${issueType(found) || 'none'})`);
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
 }

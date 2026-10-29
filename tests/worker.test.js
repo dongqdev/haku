@@ -76,7 +76,10 @@ test('abandon deletes without a gate (caller must have recorded why)', () => {
   assert.ok(!fs.existsSync(w.path));
 });
 
-const fakeHost = issues => ({ listIssues: () => issues });
+// Issues are read by number (a list lags right after creation); an unknown number is an error like gh's.
+const fakeHost = issues => ({
+  getIssue: n => { const i = issues.find(x => x.number === n); if (!i) throw new Error('Could not resolve to an issue\nwith more detail'); return i; }
+});
 const issue = (number, type, state = 'open') => ({ number, state, labels: [{ name: 'haku' }, { name: `type:${type}` }] });
 
 test('start refuses issues that are not open tasks', () => {
@@ -115,4 +118,38 @@ test('abandon keeps the remote branch', () => {
   const r = removeWorker({ cwd: repo, issue: 6, gate: null, abandon: true, deleteRemote: true });
   assert.strictEqual(r.remoteBranchDeleted, false);
   assert.ok(sh(repo, 'ls-remote', '--heads', 'origin', w.branch));
+});
+
+test('start finds an issue created a moment ago because it reads it by number, never through a list', () => {
+  const { repo, home } = setup();
+  let listCalls = 0;
+  const host = {
+    // a list that has not caught up with the new issue yet
+    listIssues: () => { listCalls += 1; return []; },
+    getIssue: n => ({ number: n, state: 'open', labels: [{ name: 'haku' }, { name: 'type:task' }] })
+  };
+  const w = startWorker({ cwd: repo, issue: 41, title: 'Brand new', base: 'main', home, host });
+  assert.strictEqual(w.issue, 41);
+  assert.strictEqual(listCalls, 0);
+});
+
+test('start refuses an unknown or unreadable issue and one that is not a haku issue, with a clear reason', () => {
+  const { repo, home } = setup();
+  const host = fakeHost([{ number: 9, state: 'open', labels: [{ name: 'bug' }] }]);
+  assert.throws(() => startWorker({ cwd: repo, issue: 404, title: 'x', base: 'main', home, host }), /issue #404 not found or not readable: Could not resolve to an issue/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 9, title: 'x', base: 'main', home, host }), /issue #9 is not a haku issue/);
+  assert.strictEqual(listWorkers(repo).length, 0);
+});
+
+test('start refuses a pull request and an issue that is not a haku issue, even with a type label', () => {
+  const { repo, home } = setup();
+  const labels = names => names.map(name => ({ name }));
+  const host = fakeHost([
+    { number: 50, state: 'open', url: 'https://github.com/o/r/pull/50', labels: labels(['haku', 'type:task']) },
+    { number: 51, state: 'open', url: 'https://github.com/o/r/issues/51', labels: labels(['type:task']) },
+    { number: 52, state: 'open', url: 'https://github.com/o/r/issues/52', labels: labels(['haku', 'type:task']) }
+  ]);
+  assert.throws(() => startWorker({ cwd: repo, issue: 50, title: 'x', base: 'main', home, host }), /#50 is a pull request/);
+  assert.throws(() => startWorker({ cwd: repo, issue: 51, title: 'x', base: 'main', home, host }), /issue #51 is not a haku issue/);
+  assert.strictEqual(startWorker({ cwd: repo, issue: 52, title: 'x', base: 'main', home, host }).issue, 52);
 });

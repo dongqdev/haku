@@ -9,7 +9,13 @@ const { prRefs, SUMMARY_MARKER, parseVerifiedMarker } = require('./model');
 //   post-merge-verification a passing verification was recorded after the merge
 function doneCheck(host, issueNumber) {
   const base = host.defaultBranch();
-  const issue = host.listIssues().find(i => i.number === issueNumber);
+  // By number: a list can show an issue as still open for seconds after it was closed by the merge.
+  let issue = null;
+  try {
+    issue = host.getIssue(issueNumber);
+  } catch (err) {
+    issue = null;
+  }
   if (!issue) return { ok: false, missing: ['issue-not-found'], base };
 
   const missing = [];

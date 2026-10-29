@@ -3,7 +3,8 @@
 const {
   issueType,
   parentOf,
-  prRefs
+  prRefs,
+  checklistNumbers
 } = require('./model');
 
 // Close what merged but stayed open. Evidence is the host's merge state of a PR
@@ -53,6 +54,10 @@ function reconcile(host, { apply = false } = {}) {
     children.get(parent).push(issue);
   }
 
+  const byNumber = new Map(issues.map(i => [i.number, i]));
+  // Parents held back by the checklist guard. The loop below runs until nothing changes, so a hold is only
+  // reported once it is final: a parent that is rolled up in a later pass is not held back after all.
+  const holds = new Map();
   const isDone = issue => issue.state === 'closed' || planned.has(issue.number);
   let changed = true;
   while (changed) {
@@ -63,6 +68,21 @@ function reconcile(host, { apply = false } = {}) {
       if (issue.state !== 'open' || planned.has(issue.number)) continue;
       const kids = children.get(issue.number) || [];
       if (kids.length === 0 || !kids.every(isDone)) continue;
+      // The list can lag behind a child created moments ago. A child the parent's own checklist names but the
+      // list does not show may still be open, so the parent is not rolled up on this read.
+      const named = checklistNumbers(issue);
+      const unseen = named.filter(n => !byNumber.has(n));
+      if (unseen.length) {
+        holds.set(issue.number, { kind: 'child-not-listed', issue: issue.number, children: unseen });
+        continue;
+      }
+      // A child the checklist names and the list shows, still open although it carries no Parent line of its own.
+      const open = named.filter(n => !isDone(byNumber.get(n)));
+      if (open.length) {
+        holds.set(issue.number, { kind: 'child-not-done', issue: issue.number, children: open });
+        continue;
+      }
+      holds.delete(issue.number);
       planned.add(issue.number);
       plan.push({
         kind: 'rollup',
@@ -71,6 +91,10 @@ function reconcile(host, { apply = false } = {}) {
       });
       changed = true;
     }
+  }
+
+  for (const hold of holds.values()) {
+    if (!planned.has(hold.issue)) warnings.push(hold);
   }
 
   for (const issue of issues) {
@@ -90,4 +114,12 @@ function reconcile(host, { apply = false } = {}) {
   return { base, plan, warnings, applied, dryRun: !apply };
 }
 
-module.exports = { reconcile };
+// One line of the text report for a warning; children, when there are any, are named so nobody has to
+// run --json to learn which issue holds a parent back.
+function describeWarning(w) {
+  const subject = w.issue ? `#${w.issue}` : `PR #${w.pr}`;
+  const children = w.children ? ` (children: ${w.children.map(n => `#${n}`).join(', ')})` : '';
+  return `${w.kind} ${subject}${children}`;
+}
+
+module.exports = { reconcile, describeWarning };
