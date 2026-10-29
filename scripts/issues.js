@@ -8,7 +8,8 @@ const { publish } = require('./lib/publish');
 const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
-const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
+const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
+const { readConfig, titlePrefixOn } = require('./lib/config');
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
@@ -63,15 +64,6 @@ function parse(argv) {
   return opts;
 }
 
-// .haku/config.json of the repository we run in; missing or unreadable means defaults.
-function readConfig() {
-  try {
-    return JSON.parse(fs.readFileSync('.haku/config.json', 'utf8'));
-  } catch (err) {
-    return {};
-  }
-}
-
 const out = obj => process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
 function needIssue(opts) {
@@ -90,6 +82,8 @@ function main(argv) {
   switch (command) {
     case 'publish': {
       if (!arg1) throw new Error('publish needs a draft file');
+      const cfg = readConfig();
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
       const mapFile = `${arg1}.map.json`;
       const state = fs.existsSync(mapFile) ? JSON.parse(fs.readFileSync(mapFile, 'utf8')) : { numbers: {} };
       let result;
@@ -98,7 +92,7 @@ function main(argv) {
           apply: Boolean(opts.apply),
           state,
           orchestrator: opts.orchestrator || null,
-        titlePrefix: readConfig().titlePrefix !== false
+        titlePrefix: titlePrefixOn(cfg.config)
         });
       } finally {
         // Save progress even when publish throws midway, so a retry resumes instead of duplicating.
@@ -201,7 +195,7 @@ function main(argv) {
     }
     case 'branch':
       needIssue(opts);
-      console.log(`task/${opts.issue}-${slugify(opts.title)}`);
+      console.log(`task/${opts.issue}-${slugify(stripPrefix(opts.title))}`);
       return 0;
     default:
       throw new Error(`unknown command: ${command}`);

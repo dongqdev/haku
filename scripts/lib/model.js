@@ -11,8 +11,8 @@ const typeLabel = type => `type:${type}`;
 // who cannot be assigned (for example, not a collaborator on the repository).
 const ownerLabel = name => `owner:${name}`;
 
-// Label colours and descriptions. The set follows the Okabe-Ito palette, which stays distinguishable
-// for people with colour-vision differences. Unknown labels keep the neutral grey.
+// Label colours and descriptions. Five colours come from the Okabe-Ito palette (distinguishable with
+// colour-vision differences); the base label's brown is the mascot's own colour. Unknown labels stay grey.
 const LABEL_STYLES = {
   [BASE_LABEL]: { color: 'A0724A', description: 'Managed by haku' },
   [typeLabel('story')]: { color: '0072B2', description: 'Story: a big goal' },
@@ -33,10 +33,13 @@ function labelStyle(name) {
 
 // "[Story] Login": the kind reads in the list without relying on colour.
 const TITLE_PREFIXES = { story: '[Story]', milestone: '[Milestone]', task: '[Task]' };
-const PREFIX_RE = /^\s*\[(?:story|milestone|task)\]\s*/i;
+const ANY_PREFIX_RE = /^\s*\[(?:story|milestone|task)\]\s*/i;
+const ownPrefixRe = type => new RegExp(`^\\s*\\[${type}\\]\\s*`, 'i');
 
-const stripPrefix = title => String(title || '').replace(PREFIX_RE, '');
-const withPrefix = (type, title) => `${TITLE_PREFIXES[type]} ${stripPrefix(title)}`;
+// Removes any kind prefix (used to compare and to name branches).
+const stripPrefix = title => String(title || '').replace(ANY_PREFIX_RE, '');
+// Adds this kind's prefix once. A prefix of another kind is the author's own text and is kept.
+const withPrefix = (type, title) => `${TITLE_PREFIXES[type]} ${String(title || '').replace(ownPrefixRe(type), '')}`;
 
 function labelNames(issue) {
   return (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
