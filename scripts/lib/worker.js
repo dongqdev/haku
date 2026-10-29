@@ -147,6 +147,15 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
   }
 
   const present = fs.existsSync(record.path);
+  // What the checks are about to look at, taken before the first of them: if it differs right before the deletion,
+  // someone was still working and nothing is deleted.
+  const snapshot = () => {
+    const st = present ? gitTry(record.path, ['status', '--porcelain']) : { ok: true, out: '' };
+    const tip = gitTry(cwd, ['rev-parse', record.branch]);
+    const head = present ? gitTry(record.path, ['rev-parse', 'HEAD']) : { ok: true, out: '' };
+    return [st, tip, head].map(r => (r.ok ? r.out : 'unreadable')).join('|');
+  };
+  const before = snapshot();
   const status = present ? gitTry(record.path, ['status', '--porcelain', '--ignored']) : { ok: true, out: '' };
   if (!status.ok) throw new Error(`refusing to delete worker #${issue}; could not read the worktree status: ${status.err}`);
   const lines = status.out ? status.out.split('\n') : [];
@@ -208,20 +217,17 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
   // A session still running in the worktree could commit between the checks above and the deletion below. So it is
   // stopped first, and what the checks looked at is compared once more: if anything moved, nothing is deleted.
   const sessionResult = { stopped: null, removed: null, error: null };
-  const snapshot = () => {
-    const st = present ? gitTry(record.path, ['status', '--porcelain']) : { ok: true, out: '' };
-    const tip = gitTry(cwd, ['rev-parse', record.branch]);
-    const head = present ? gitTry(record.path, ['rev-parse', 'HEAD']) : { ok: true, out: '' };
-    return [st, tip, head].map(r => (r.ok ? r.out : 'unreadable')).join('|');
-  };
   if (record.sessionId && sessions) {
-    const before = snapshot();
     const stop = sessions.stop(record.sessionId);
     sessionResult.stopped = stop.stopped;
     sessionResult.error = stop.error || null;
-    if (snapshot() !== before) {
-      throw new Error(`refusing to delete worker #${issue}; the worker's session produced new work while it was being stopped, so nothing was deleted (run worker-rm again to check the new state)`);
+    // A session that cannot be stopped may still be writing into the worktree: delete nothing.
+    if (!stop.stopped) {
+      throw new Error(`refusing to delete worker #${issue}; its session ${record.sessionId} could not be stopped (${stop.error || 'unknown reason'}); stop it yourself with: claude stop ${record.sessionId}`);
     }
+  }
+  if (snapshot() !== before) {
+    throw new Error(`refusing to delete worker #${issue}; the worktree changed while it was being checked (a session or a subagent was still working), so nothing was deleted (run worker-rm again to check the new state)`);
   }
 
   if (present) git(cwd, ['worktree', 'remove', '--force', record.path]);

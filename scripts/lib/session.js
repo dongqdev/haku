@@ -46,7 +46,8 @@ function acceptanceOf(body) {
 }
 
 // Any line that looks like one of the fence markers, whatever its letter case or look-alike characters.
-const looksLikeFence = line => /={3,}.*issue\s*text/i.test(line.normalize('NFKC'));
+// Invisible format characters (zero-width spaces and the like) are dropped before comparing, so they cannot split a marker.
+const looksLikeFence = line => /={3,}.*issue\s*text/i.test(line.normalize('NFKC').replace(/\p{Cf}/gu, ''));
 
 // Two texts. The PROMPT (an argument of the session) holds the rules and the task facts the tool parsed, all
 // bounded. The ISSUE FILE (.haku-issue.md in the worktree, ignored by git) holds the whole issue text, fenced as
@@ -101,6 +102,23 @@ function excludeLocally(cwd, pattern) {
   fs.writeFileSync(file, `${current}${current && !current.endsWith('\n') ? '\n' : ''}${pattern}\n`);
 }
 
+// Writes the issue file only where nothing exists yet. A path that is already there (a tracked file, or a
+// symlink committed under that name that would carry the text to some other file) is refused, never followed.
+function writeIssueFile(worktree, file, text) {
+  const tracked = spawnSync('git', ['ls-files', '--', ISSUE_FILE], { cwd: worktree, encoding: 'utf8' });
+  if (tracked.status === 0 && tracked.stdout.trim()) {
+    throw new Error(`${ISSUE_FILE} is tracked in the repository; refusing to write the issue text over it (remove it from the repository or rename the file)`);
+  }
+  let exists = true;
+  try {
+    fs.lstatSync(file);
+  } catch (err) {
+    exists = false;
+  }
+  if (exists) throw new Error(`${file} already exists; refusing to write the issue text over it`);
+  fs.writeFileSync(file, text, { encoding: 'utf8', flag: 'wx' });
+}
+
 function claudeCommand() {
   return process.env.HAKU_CLAUDE_BIN || 'claude';
 }
@@ -128,16 +146,22 @@ function launchSession({ name, cwd, pluginRoot, prompt, remoteControl = true, pe
   return { sessionId: m[1], sessionName: name };
 }
 
-// The background sessions as `claude agents --json` reports them; [] when that cannot be read.
-function listSessions({ claudeBin = claudeCommand(), spawn = spawnSync } = {}) {
+// The background sessions as `claude agents --json` reports them, or null when that cannot be read. Null is not
+// "no sessions": a caller that must know whether a session still exists has to tell the two apart.
+function readSessions({ claudeBin = claudeCommand(), spawn = spawnSync } = {}) {
   try {
     const r = spawn(claudeBin, ['agents', '--json'], { encoding: 'utf8', timeout: SESSION_TIMEOUT_MS });
-    if (r.error || r.status !== 0) return [];
+    if (r.error || r.status !== 0) return null;
     const list = JSON.parse(r.stdout);
-    return Array.isArray(list) ? list : [];
+    return Array.isArray(list) ? list : null;
   } catch (err) {
-    return [];
+    return null;
   }
+}
+
+// For callers that only look for sessions to end or to show: an unreadable list is empty here.
+function listSessions(options = {}) {
+  return readSessions(options) || [];
 }
 
 const runOne = (spawn, claudeBin, args) => {
@@ -154,7 +178,13 @@ const runOne = (spawn, claudeBin, args) => {
 // gone must not keep a cleanup from finishing, so what happened is reported instead.
 const stopOnly = ({ id, claudeBin = claudeCommand(), spawn = spawnSync }) => {
   const r = runOne(spawn, claudeBin, ['stop', id]);
-  return { stopped: r.ok, error: r.error };
+  if (r.ok) return { stopped: true, error: null };
+  // `stop` also fails for a session that no longer exists, which is exactly what we want: it is not running.
+  // If the list itself cannot be read nothing is known, and "could not stop" stays the answer.
+  const sessions = readSessions({ claudeBin, spawn });
+  if (sessions === null) return { stopped: false, error: r.error || 'the list of sessions could not be read' };
+  const stillThere = sessions.some(a => a && String(a.id) === String(id));
+  return stillThere ? { stopped: false, error: r.error } : { stopped: true, gone: true, error: null };
 };
 const removeSession = ({ id, claudeBin = claudeCommand(), spawn = spawnSync }) => {
   const r = runOne(spawn, claudeBin, ['rm', id]);
@@ -176,10 +206,12 @@ function launchWorker({ host, cwd, issue, orchestrator, repo = null, base, home,
   const name = `[Worker ${issue}] ${cut(stripPrefix(found.title).replace(/\s+/g, ' '), 60)}`;
   const issueFile = path.join(record.path, ISSUE_FILE);
   let session = null;
+  let wroteIssueFile = false;
   try {
     excludeLocally(cwd, `/${ISSUE_FILE}`);
     const { prompt, issueText } = buildBrief({ issue: found, record, orchestrator, pluginRoot, repo, base, issueFile });
-    fs.writeFileSync(issueFile, issueText, 'utf8');
+    writeIssueFile(record.path, issueFile, issueText);
+    wroteIssueFile = true;
     session = launchSession({
       name, cwd: record.path, pluginRoot, prompt,
       remoteControl: settings.remoteControl !== false,
@@ -190,14 +222,17 @@ function launchWorker({ host, cwd, issue, orchestrator, repo = null, base, home,
     return { ...record, ...session, orchestrator };
   } catch (err) {
     const ids = session ? [session.sessionId]
-      : listSessions({ claudeBin, spawn }).filter(a => a && a.name === name && a.id).map(a => a.id);
+      : listSessions({ claudeBin, spawn }).filter(a => a && a.name === name && a.id && a.cwd === record.path).map(a => a.id);
     for (const id of ids) stopSession({ id, claudeBin, spawn });
     try {
       removeWorker({ cwd, issue, gate: null, abandon: true, discard: true });
     } catch (cleanup) {
       err.message += ` (and the new worktree could not be removed: ${cleanup.message})`;
     }
-    fs.rmSync(issueFile, { force: true });
+    if (wroteIssueFile) fs.rmSync(issueFile, { force: true });
+    if (!session && /ETIMEDOUT|could not read the session id/.test(err.message) && !ids.length) {
+      err.message += ` (a session named "${name}" may be running anyway: look for it with claude agents and stop it with claude stop <id>)`;
+    }
     throw err;
   }
 }
@@ -215,6 +250,6 @@ function withSessionStates(records, { claudeBin, spawn } = {}) {
 }
 
 module.exports = {
-  buildBrief, workerRules, launchSession, listSessions, stopOnly, removeSession, stopSession, launchWorker, withSessionStates,
+  buildBrief, workerRules, launchSession, readSessions, listSessions, stopOnly, removeSession, stopSession, launchWorker, withSessionStates,
   ISSUE_FILE, DATA_START, DATA_END, MAX_TITLE, MAX_LINE, MAX_ACCEPTANCE_LINES, MAX_SCOPE
 };

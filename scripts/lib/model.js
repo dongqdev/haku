@@ -79,7 +79,8 @@ function dependsOn(issue) {
 // instructions for a worker must read it through this.
 function readableText(body) {
   return stripNonClaims(body)
-    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, '')          // an unclosed comment hides the rest of the page
+    .replace(/^\s*\[\/\/\]:\s*#.*$/gm, '')         // link-reference comments: [//]: # (hidden)
     .replace(/~~~[\s\S]*?~~~/g, '');
 }
 
