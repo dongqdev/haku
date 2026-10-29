@@ -9,6 +9,8 @@ const { BASE_LABEL, ownerLabel, labelStyle } = require('./model');
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
 // `exec(bin, args, options)` can be injected so tests need no real gh (or shell) on any OS.
+const GH_TIMEOUT_MS = 60000;
+
 function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {}) {
   const scope = repo ? ['-R', repo] : [];
 
@@ -17,7 +19,9 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       encoding: 'utf8',
       input,
       stdio: ['pipe', 'pipe', 'pipe'],
-      maxBuffer: 64 * 1024 * 1024
+      maxBuffer: 64 * 1024 * 1024,
+      // A hung gh must not hang a safety check; a timeout throws and the caller fails closed.
+      timeout: GH_TIMEOUT_MS
     });
   }
 
@@ -65,15 +69,24 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       return { ...i, state: String(i.state).toLowerCase() };
     },
 
+    // Every pull request ever opened from this branch, in any state: the branch name alone is not
+    // proof, so callers compare the head commit (headRefOid) with the commit they hold.
+    prsForBranch(branch) {
+      const out = gh(['pr', 'list', ...scope, '--head', branch, '--state', 'all', '--limit', '30',
+        '--json', 'number,state,mergedAt,headRefOid']);
+      return JSON.parse(out).map(pr => ({ ...pr, state: String(pr.state).toLowerCase() }));
+    },
+
     listMergedPrs(base) {
       const out = gh([
         'pr', 'list', ...scope, '--state', 'merged', '--base', base,
-        '--limit', '500', '--json', 'number,body,headRefName,mergedAt,closingIssuesReferences'
+        '--limit', '500', '--json', 'number,body,headRefName,headRefOid,mergedAt,closingIssuesReferences'
       ]);
       return JSON.parse(out).map(pr => ({
         number: pr.number,
         body: pr.body,
         headRefName: pr.headRefName,
+        headRefOid: pr.headRefOid,
         mergedAt: pr.mergedAt,
         closingIssues: (pr.closingIssuesReferences || []).map(r => r.number)
       }));

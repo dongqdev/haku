@@ -63,7 +63,7 @@ test('remove is refused without a passing gate and leaves everything intact', ()
 test('remove with a passing gate deletes worktree, branch and record', () => {
   const { repo, home } = setup();
   const w = startWorker({ cwd: repo, issue: 5, title: 'y', base: 'main', home });
-  removeWorker({ cwd: repo, issue: 5, gate: { ok: true, missing: [] } });
+  removeWorker({ cwd: repo, issue: 5, gate: { ok: true, missing: [], prHead: sh(repo, 'rev-parse', w.branch) } });
   assert.ok(!fs.existsSync(w.path));
   assert.strictEqual(listWorkers(repo).length, 0);
   assert.ok(!sh(repo, 'branch', '--list', w.branch));
@@ -99,7 +99,7 @@ test('remove deletes the remote task branch only after a passing gate', () => {
   const w = startWorker({ cwd: repo, issue: 5, title: 'Push Me', base: 'main', home });
   sh(w.path, 'push', '-q', 'origin', w.branch);
   assert.ok(sh(repo, 'ls-remote', '--heads', 'origin', w.branch));
-  const r = removeWorker({ cwd: repo, issue: 5, gate: { ok: true }, deleteRemote: true });
+  const r = removeWorker({ cwd: repo, issue: 5, gate: { ok: true, prHead: sh(repo, 'rev-parse', w.branch) }, deleteRemote: true });
   assert.strictEqual(r.remoteBranchDeleted, true);
   assert.strictEqual(sh(repo, 'ls-remote', '--heads', 'origin', w.branch), '');
 });
