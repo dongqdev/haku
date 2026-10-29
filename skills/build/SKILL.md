@@ -42,6 +42,16 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 - Do not delete, skip or weaken tests to get a pass.
 - Record each acceptance criterion as met or unmet with evidence (command output, file, screenshot); finish with a summary of what was done, what was tried and failed, and open risks.
 
+## Labels that say why an issue is not moving
+
+Keep the state labels in step with what is really happening, with `issues.js label --issue N --add <label>` and `--remove <label>`:
+
+- `needs-user` while you wait for the user's decision on that task (a merge approval, a T3 verdict, a question from the worker); remove it when the user has answered.
+- `blocked` while the task cannot go on until something else is resolved (an unmet `Depends-On`, a failing platform CI, a worker blocked on a permission); remove it when that is resolved.
+- `deferred` when the user chose to postpone the task; it stays open and is not dropped. Remove it when work resumes.
+
+`label` only touches these three and the `kind:*` labels, so it can never change `haku`, `type:*` or `sprint:*`. Labels are a view for the user, not a gate: a missing or stale label never blocks a merge or a roll-up.
+
 ## Measurement document (T3)
 
 Create it as a comment on the task issue and as a file in the PR description area: prerequisites, numbered steps, the expected value per step, and a results table for the user to fill (measured value, pass/fail, evidence). The comment only records measured values and evidence; the verdict is never read from free text. When the user says the measurement is done, ask the verdict with a choice question (통과 / 실패 / 추가 측정 필요). On "실패" return the recorded results to a worker; on "통과" continue at step 5 (that answer is the merge consent).

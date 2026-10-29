@@ -190,6 +190,15 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       for (const name of names) createLabel(name);
     },
 
+    // Adds and removes labels on one issue; added ones are created first so they carry haku's colours.
+    setLabels(number, { add = [], remove = [] } = {}) {
+      for (const name of add) createLabel(name);
+      const args = ['issue', 'edit', String(number), ...scope];
+      if (add.length) args.push('--add-label', add.join(','));
+      if (remove.length) args.push('--remove-label', remove.join(','));
+      if (args.length > 3 + scope.length) gh(args);
+    },
+
     // The assignee owns the issue. GitHub silently drops an assignee it cannot assign (for example
     // someone who is not a collaborator) instead of failing, so the result is checked after creation
     // and an owner:<name> label is added when the assignment did not stick.

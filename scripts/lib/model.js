@@ -5,8 +5,12 @@
 
 const TYPES = ['story', 'milestone', 'task'];
 const BASE_LABEL = 'haku';
+// What kind of work an issue is (one per issue) and the state labels that say why it is not moving.
+const WORK_KINDS = ['design', 'dev', 'bug', 'docs', 'research', 'chore'];
+const STATE_LABELS = ['deferred', 'blocked', 'needs-user'];
 
 const typeLabel = type => `type:${type}`;
+const kindLabel = kind => `kind:${kind}`;
 // Who owns an issue is the host's assignee. The owner label is only the fallback for people
 // who cannot be assigned (for example, not a collaborator on the repository).
 const ownerLabel = name => `owner:${name}`;
@@ -19,7 +23,16 @@ const LABEL_STYLES = {
   [BASE_LABEL]: { color: '6F4E37', description: 'Managed by haku' },
   [typeLabel('story')]: { color: '0072B2', description: 'Story: a big goal' },
   [typeLabel('milestone')]: { color: '007A5A', description: 'Milestone: a stage of a story' },
-  [typeLabel('task')]: { color: 'C75B00', description: 'Task: what one worker does' }
+  [typeLabel('task')]: { color: 'C75B00', description: 'Task: what one worker does' },
+  [kindLabel('design')]: { color: '6A3D9A', description: 'Design: decide the approach and scope before building' },
+  [kindLabel('dev')]: { color: '2B5C8A', description: 'Development: build or change a feature' },
+  [kindLabel('bug')]: { color: 'B3261E', description: 'Bug: fix something that is broken' },
+  [kindLabel('docs')]: { color: '2E7D32', description: 'Docs: README and guides' },
+  [kindLabel('research')]: { color: '00838F', description: 'Research: find out and reach a conclusion' },
+  [kindLabel('chore')]: { color: '5F6B73', description: 'Chore: setup, refactor, dependencies; no behavior change' },
+  deferred: { color: '56657A', description: 'Postponed on purpose; not dropped' },
+  blocked: { color: '9A1B1B', description: 'Cannot go on until something else is resolved' },
+  'needs-user': { color: '8A6100', description: 'Waiting for a user decision' }
 };
 const PREFIX_STYLES = [
   ['sprint:', { color: 'A24B7D', description: 'Sprint' }],
@@ -42,6 +55,12 @@ const ownPrefixRe = type => new RegExp(`^\\s*\\[${type}\\]\\s*`, 'i');
 const stripPrefix = title => String(title || '').replace(ANY_PREFIX_RE, '');
 // Adds this kind's prefix once. A prefix of another kind is the author's own text and is kept.
 const withPrefix = (type, title) => `${TITLE_PREFIXES[type]} ${String(title || '').replace(ownPrefixRe(type), '')}`;
+
+// The labels haku owns and `setup` creates, with their colours.
+function baseLabelDefinitions() {
+  const names = [BASE_LABEL, ...TYPES.map(typeLabel), ...WORK_KINDS.map(kindLabel), ...STATE_LABELS];
+  return names.map(name => ({ name, ...labelStyle(name) }));
+}
 
 function labelNames(issue) {
   return (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
@@ -154,6 +173,10 @@ module.exports = {
   TYPES,
   BASE_LABEL,
   typeLabel,
+  kindLabel,
+  WORK_KINDS,
+  STATE_LABELS,
+  baseLabelDefinitions,
   ownerLabel,
   labelStyle,
   TITLE_PREFIXES,
