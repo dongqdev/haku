@@ -100,6 +100,16 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       return { ...i, state: String(i.state).toLowerCase() };
     },
 
+    // The issues GitHub itself will close when this pull request merges (what "Closes #N" really linked).
+    // A full answer might have been cut off, so it is an error rather than a result.
+    prClosingIssues(number) {
+      const limit = 50;
+      const pr = JSON.parse(gh(['pr', 'view', String(number), ...scope, '--json', 'number,state,closingIssuesReferences']));
+      const refs = pr.closingIssuesReferences || [];
+      if (refs.length >= limit) throw new Error(`pull request #${number} links ${refs.length} issues, which reaches the limit of ${limit}; refusing to decide on a partial list`);
+      return { number: pr.number, state: String(pr.state).toLowerCase(), issues: refs.map(r => r.number) };
+    },
+
     // Every pull request ever opened from this branch, in any state: the branch name alone is not
     // proof, so callers compare the head commit (headRefOid) with the commit they hold.
     prsForBranch(branch) {

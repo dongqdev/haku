@@ -91,4 +91,25 @@ function checkBody(body, issue) {
   return { ok: problems.length === 0, problems };
 }
 
-module.exports = { SECTIONS, skeleton, checkBody };
+function defaultSleep(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+// Does GitHub itself link this pull request to exactly the expected issue? The body text alone cannot say: a
+// closing line in another repository, a typo, "Closed #N" or a line in a code block links nothing. GitHub updates
+// the link a moment after the body changes, so an empty answer is read once more after a pause.
+function checkClosingLink(host, pr, issue, { sleep = defaultSleep, waitMs = 5000 } = {}) {
+  let linked = host.prClosingIssues(pr);
+  if (linked.issues.length === 0) {
+    sleep(waitMs);
+    linked = host.prClosingIssues(pr);
+  }
+  const problems = [];
+  if (linked.issues.length === 0) problems.push(`GitHub는 PR #${pr}에 연결된 이슈가 없다고 답합니다: 병합해도 #${issue}가 닫히지 않습니다 (닫는 줄을 확인하세요)`);
+  else if (linked.issues.length !== 1 || linked.issues[0] !== issue) {
+    problems.push(`GitHub가 PR #${pr}에 연결한 이슈는 ${linked.issues.map(n => `#${n}`).join(', ')}이며, 기대한 #${issue} 하나와 같지 않습니다`);
+  }
+  return { ok: problems.length === 0, problems, linked: linked.issues };
+}
+
+module.exports = { SECTIONS, skeleton, checkBody, checkClosingLink };

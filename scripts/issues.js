@@ -14,7 +14,7 @@ const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
-const { skeleton, checkBody } = require('./lib/pr-body');
+const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
@@ -38,7 +38,7 @@ Usage:
   issues.js triage [--json] [--repo <owner/repo>]
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js pr-body --issue <N>
-  issues.js pr-check --issue <N> --file <body.md>
+  issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
   issues.js project-names --names <a,b,c> [--owner <account>]
   issues.js project-new --name <repo> --dir <parent folder> [--owner <account>] [--visibility private|public] [--apply]
@@ -53,7 +53,7 @@ project-new   Dry-run by default; --apply creates the folder, the first commit a
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -74,6 +74,7 @@ function parse(argv) {
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
+  if (opts.pr !== undefined) opts.pr = Number(opts.pr);
   return opts;
 }
 
@@ -235,12 +236,16 @@ function main(argv) {
       return 0;
     case 'pr-check': {
       needIssue(opts);
-      if (!opts.file) throw new Error('--file <body.md> is required');
-      const result = checkBody(fs.readFileSync(opts.file, 'utf8'), opts.issue);
+      if (!opts.file && opts.pr === undefined) throw new Error('--file <body.md> or --pr <number> is required');
+      if (opts.pr !== undefined && !Number.isInteger(opts.pr)) throw new Error('--pr needs a pull request number');
+      const problems = [];
+      if (opts.file) problems.push(...checkBody(fs.readFileSync(opts.file, 'utf8'), opts.issue).problems);
+      if (opts.pr !== undefined) problems.push(...checkClosingLink(host(), opts.pr, opts.issue).problems);
+      const result = { ok: problems.length === 0, problems };
       if (opts.json) out(result);
-      else if (result.ok) console.log(`#${opts.issue}: PR 본문 점검 통과`);
+      else if (result.ok) console.log(`#${opts.issue}: PR 점검 통과`);
       else {
-        console.log(`#${opts.issue}: PR 본문 점검 실패`);
+        console.log(`#${opts.issue}: PR 점검 실패`);
         for (const p of result.problems) console.log(`  - ${p}`);
       }
       return result.ok ? 0 : 1;
