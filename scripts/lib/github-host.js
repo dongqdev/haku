@@ -8,11 +8,12 @@ const { BASE_LABEL, ownerLabel } = require('./model');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
-function createGitHubHost({ repo = null, ghBin = 'gh' } = {}) {
+// `exec(bin, args, options)` can be injected so tests need no real gh (or shell) on any OS.
+function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {}) {
   const scope = repo ? ['-R', repo] : [];
 
   function gh(args, input) {
-    return execFileSync(ghBin, args, {
+    return exec(ghBin, args, {
       encoding: 'utf8',
       input,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -68,7 +69,9 @@ function createGitHubHost({ repo = null, ghBin = 'gh' } = {}) {
     // The assignee owns the issue. GitHub silently drops an assignee it cannot assign (for example
     // someone who is not a collaborator) instead of failing, so the result is checked after creation
     // and an owner:<name> label is added when the assignment did not stick.
-    createIssue({ title, body, labels, assignee }) {
+    createIssue({ title, body, labels, assignee: requested }) {
+      // "@me" is a gh convenience; compare against the real login.
+      const assignee = requested === '@me' ? gh(['api', 'user', '--jq', '.login']).trim() : requested;
       const out = withBodyFile(body, file => gh([
         'issue', 'create', ...scope, '--title', title, '--body-file', file,
         '--label', labels.join(','),
@@ -78,12 +81,18 @@ function createGitHubHost({ repo = null, ghBin = 'gh' } = {}) {
       if (!m) throw new Error(`could not read the new issue number from: ${out.trim()}`);
       const number = Number(m[1]);
       if (assignee) {
-        const assigned = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'assignees']))
-          .assignees.map(a => String(a.login).toLowerCase());
-        if (!assigned.includes(String(assignee).toLowerCase())) {
-          const label = ownerLabel(assignee);
-          gh(['label', 'create', label, ...scope, '--force', '--color', 'ededed']);
-          gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
+        // The issue already exists, so a failure here must not lose its number (a retry would
+        // create a duplicate); it is reported and the number is still returned.
+        try {
+          const assigned = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'assignees']))
+            .assignees.map(a => String(a.login).toLowerCase());
+          if (!assigned.includes(String(assignee).toLowerCase())) {
+            const label = ownerLabel(assignee);
+            gh(['label', 'create', label, ...scope, '--force', '--color', 'ededed']);
+            gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
+          }
+        } catch (err) {
+          process.stderr.write(`[ecc-harness] warning: issue #${number} created, but the owner could not be recorded: ${String(err.message).split('\n')[0]}\n`);
         }
       }
       return number;
