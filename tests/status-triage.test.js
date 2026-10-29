@@ -142,6 +142,11 @@ test('similar but different titles are not duplicates', () => {
   assert.deepStrictEqual(t.duplicates, []);
 });
 
+test('a milestone without a Parent line is still not backlog', () => {
+  const t = buildTriage([issue(1, 'milestone', 'open'), issue(2, 'story', 'open'), issue(3, 'task', 'open')]);
+  assert.deepStrictEqual(t.backlog.map(b => b.number), [3]);
+});
+
 test('triage never offers stories, milestones or planned tasks for closing', () => {
   assert.match(closeBlocker(issue(1, 'story', 'open')), /story/);
   assert.match(closeBlocker(issue(2, 'milestone', 'open', 'Parent: #1')), /milestone/);
@@ -168,6 +173,9 @@ test('the new skills describe their safety rules', () => {
   assert.match(read('sniff'), /At most two revision rounds/);
   assert.match(read('sniff'), /never beyond the eight-question total/);
   assert.match(read('plan'), /\.haku\/drafts\/\*\.goal\.md/);
+  assert.match(read('plan'), /use exactly that file/);
+  assert.match(read('plan'), /never assume the newest is current/);
+  assert.match(read('plan'), /\.haku\/drafts\/done\//);
   assert.match(read('retro'), /never to the installed copy/);
   assert.match(read('plan'), /Hand over to `\/haku:sniff`/);
 });
