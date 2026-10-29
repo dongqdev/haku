@@ -53,6 +53,14 @@ function assertTaskIssue(host, issue) {
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
 }
 
+// Adds facts to a worker's record (for example the session it runs in).
+function updateRecord(cwd, issue, patch) {
+  const file = path.join(recordDir(cwd), `worker-${issue}.json`);
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+  fs.writeFileSync(file, JSON.stringify({ ...record, ...patch }, null, 2));
+  return { ...record, ...patch };
+}
+
 function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT_MAX_WORKERS }) {
   if (host) assertTaskIssue(host, issue);
   const existing = listWorkers(cwd);
@@ -130,7 +138,7 @@ function deleteRemoteBranch(cwd, branch, expectedTip) {
 // abandon skips the gate; discard is the explicit "throw the uncommitted files away".
 // With deleteRemote and a passing gate the remote task branch is deleted too (a branch the host already
 // deleted is not an error); abandoned work keeps its remote branch.
-function removeWorker({ cwd, issue, gate, abandon = false, discard = false, deleteRemote = false }) {
+function removeWorker({ cwd, issue, gate, abandon = false, discard = false, deleteRemote = false, stopSession = null }) {
   const record = listWorkers(cwd).find(w => w.issue === issue);
   if (!record) throw new Error(`no worker for #${issue}`);
   if (!abandon && !(gate && gate.ok)) {
@@ -209,7 +217,9 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
     remoteBranchDeleted = r.deleted;
     if (!r.deleted) remoteBranchKept = r.error;
   }
-  return { ...record, remoteBranchDeleted, remoteBranchKept, discarded, ignoredFilesDeleted: ignored.slice(0, 20) };
+  // The worktree is gone, so ending its session cannot lose anything; a session that will not stop is reported.
+  const session = record.sessionId && stopSession ? stopSession(record.sessionId) : null;
+  return { ...record, remoteBranchDeleted, remoteBranchKept, discarded, ignoredFilesDeleted: ignored.slice(0, 20), session };
 }
 
-module.exports = { startWorker, removeWorker, listWorkers, workerRoot, deleteRemoteBranch, remoteBranchTip, DEFAULT_MAX_WORKERS };
+module.exports = { startWorker, removeWorker, listWorkers, updateRecord, workerRoot, deleteRemoteBranch, remoteBranchTip, DEFAULT_MAX_WORKERS };

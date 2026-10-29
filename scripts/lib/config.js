@@ -35,10 +35,31 @@ function readConfig(cwd = process.cwd()) {
   if ('titlePrefix' in config && typeof config.titlePrefix !== 'boolean') {
     warnings.push(`titlePrefix in ${file} must be true or false, not ${JSON.stringify(config.titlePrefix)}; the prefix stays on`);
   }
+  if ('workerMode' in config && !WORKER_MODES.includes(config.workerMode)) {
+    warnings.push(`workerMode in ${file} must be one of ${WORKER_MODES.join(', ')}, not ${JSON.stringify(config.workerMode)}; "subagent" is used`);
+  }
+  if ('workerPermissionMode' in config && typeof config.workerPermissionMode !== 'string') {
+    warnings.push(`workerPermissionMode in ${file} must be a string; the user's own setting is used`);
+  }
+  if ('workerRemoteControl' in config && typeof config.workerRemoteControl !== 'boolean') {
+    warnings.push(`workerRemoteControl in ${file} must be true or false; it stays on`);
+  }
   return { config, warnings, file };
+}
+
+const WORKER_MODES = ['subagent', 'session'];
+
+// How workers run. Defaults: a subagent of the orchestrator; as a session the user's own permission setting
+// applies unless a mode is named, and the session also shows up in the Claude app.
+function workerSettings(config) {
+  return {
+    mode: WORKER_MODES.includes(config.workerMode) ? config.workerMode : 'subagent',
+    permissionMode: typeof config.workerPermissionMode === 'string' && config.workerPermissionMode ? config.workerPermissionMode : null,
+    remoteControl: config.workerRemoteControl !== false
+  };
 }
 
 // Only a real boolean false switches the prefix off.
 const titlePrefixOn = config => config.titlePrefix !== false;
 
-module.exports = { readConfig, repoRoot, titlePrefixOn };
+module.exports = { readConfig, repoRoot, titlePrefixOn, workerSettings, WORKER_MODES };

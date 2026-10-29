@@ -46,6 +46,18 @@ Coming from the earlier name? See [docs/upgrading.md](docs/upgrading.md).
 
 Every task PR is written in Korean with the same sections: 요약 (what), 이유 (why), 변경 내용 (changes), 테스트 (commands run, results, what was confirmed in a real environment and what was not), 위험과 영향 (compatibility, rollback, follow-ups), and the `Closes #N` line. `issues.js pr-body --issue N` prints the skeleton and `issues.js pr-check` rejects missing or empty sections, sections without Korean prose (code and quotes do not count), and closing lines that do not match the task, including `owner/repo#N` and URL forms. Each section needs at least 5 Korean characters of prose, so a section that only lists file names in code must add a sentence. `build` runs the check before asking for merge approval.
 
+## Workers
+
+`build` runs one worker per ready task in its own git worktree. By default a worker is a **subagent** of the orchestrator. With `"workerMode": "session"` in `.haku/config.json` each worker is its own background Claude Code session instead (`issues.js worker-launch`): visible in the Claude app, with its own context, and it keeps going when the orchestrator session ends or is compacted. A session worker never talks to the user; it reports to the orchestrator with SendMessage and the orchestrator asks the user through choice questions. Reviews and analysis stay subagents.
+
+| `.haku/config.json` | Meaning |
+|---|---|
+| `workerMode` | `"subagent"` (default) or `"session"` |
+| `workerPermissionMode` | a Claude Code permission mode for session workers; unset means the user's own setting |
+| `workerRemoteControl` | `false` keeps session workers out of the Claude app sidebar (default `true`) |
+
+Session workers need the `claude` command on `PATH` (set `HAKU_CLAUDE_BIN` to use another; on Windows `claude.exe`, not a `.cmd` shim), a repository that has been trusted once in an interactive `claude`, and the same Claude account as the orchestrator so that messages can be delivered. `issues.js config` prints the settings in effect.
+
 ## Labels and titles
 
 haku creates its labels with fixed colours: hues from the Okabe-Ito palette (distinguishable with colour-vision differences), darkened so GitHub shows white label text, and the mascot's brown for the base label. `haku` brown, `type:story` blue, `type:milestone` green, `type:task` orange, `sprint:*` purple, `owner:*` slate, each with a short description. (GitHub picks the text colour itself from the background's lightness, so white text is reached by darker backgrounds.) Issue titles get a kind prefix, `[Story]`, `[Milestone]` or `[Task]`, so the kind reads without colour; set `"titlePrefix": false` in `.haku/config.json` to switch the prefix off. Existing labels get their colour updated the next time haku ensures them (`gh label create --force`).
