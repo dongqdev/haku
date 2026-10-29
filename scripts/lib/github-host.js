@@ -203,7 +203,8 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       const [owner, name] = repoSlug().split('/');
       const query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state '
         + 'closedByPullRequestsReferences(first:50,includeClosedPrs:true){pageInfo{hasNextPage} nodes{number state merged baseRefName}} '
-        + 'timelineItems(itemTypes:[CLOSED_EVENT],last:1){nodes{... on ClosedEvent{createdAt stateReason closer{__typename ... on PullRequest{number merged baseRefName} ... on Commit{oid}}}}}}}}';
+        + 'timelineItems(itemTypes:[CLOSED_EVENT],last:1){nodes{... on ClosedEvent{createdAt stateReason closer{__typename ... on PullRequest{number merged baseRefName repository{nameWithOwner}} ... on Commit{oid}}}}} '
+        + 'reopened: timelineItems(itemTypes:[REOPENED_EVENT],last:1){nodes{... on ReopenedEvent{createdAt}}}}}}';
       const data = JSON.parse(gh(['api', ...apiHost, 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `number=${number}`]));
       if (data.errors && data.errors.length) throw new Error(`closing pull requests of #${number}: ${data.errors[0].message}`);
       const issue = data.data.repository.issue;
@@ -214,10 +215,12 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       const closer = event && event.closer ? event.closer : null;
       return {
         state: String(issue.state).toLowerCase(),
+        repo: repoSlug(),
         closedAt: event ? event.createdAt : null,
+        reopenedAt: ((issue.reopened && issue.reopened.nodes) || [])[0] ? issue.reopened.nodes[0].createdAt : null,
         stateReason: event && event.stateReason ? String(event.stateReason).toLowerCase() : null,
         closedBy: !closer ? { type: 'none' }
-          : closer.__typename === 'PullRequest' ? { type: 'pr', number: closer.number, merged: Boolean(closer.merged), base: closer.baseRefName }
+          : closer.__typename === 'PullRequest' ? { type: 'pr', number: closer.number, merged: Boolean(closer.merged), base: closer.baseRefName, repo: closer.repository ? closer.repository.nameWithOwner : null }
             : { type: 'commit' },
         prs: refs.nodes.map(p => ({ number: p.number, state: String(p.state).toLowerCase(), merged: Boolean(p.merged), base: p.baseRefName }))
       };

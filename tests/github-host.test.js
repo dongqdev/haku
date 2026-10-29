@@ -75,18 +75,19 @@ const graphqlHost = reply => createGitHubHost({ repo: 'o/r', exec: (bin, args) =
   assert.deepStrictEqual(args.slice(0, 2), ['api', 'graphql']);
   return typeof reply === 'function' ? reply(args) : reply;
 } });
-const closedIssue = (event, nodes = [], hasNextPage = false) => ({
+const closedIssue = (event, nodes = [], hasNextPage = false, reopened = []) => ({
   state: 'CLOSED',
+  reopened: { nodes: reopened },
   closedByPullRequestsReferences: { pageInfo: { hasNextPage }, nodes },
   timelineItems: { nodes: event ? [event] : [] }
 });
 
 test('issueClosers reads the last close: a merged pull request, a commit, or nobody', () => {
-  const pr = { createdAt: '2026-01-02T00:00:00Z', stateReason: 'COMPLETED', closer: { __typename: 'PullRequest', number: 5, merged: true, baseRefName: 'main' } };
+  const pr = { createdAt: '2026-01-02T00:00:00Z', stateReason: 'COMPLETED', closer: { __typename: 'PullRequest', number: 5, merged: true, baseRefName: 'main', repository: { nameWithOwner: 'O/R' } } };
   const byPr = graphqlHost(closersReply(closedIssue(pr, [{ number: 5, state: 'MERGED', merged: true, baseRefName: 'main' }]))).issueClosers(2);
   assert.deepStrictEqual(byPr, {
-    state: 'closed', closedAt: '2026-01-02T00:00:00Z', stateReason: 'completed',
-    closedBy: { type: 'pr', number: 5, merged: true, base: 'main' },
+    state: 'closed', repo: 'o/r', closedAt: '2026-01-02T00:00:00Z', reopenedAt: null, stateReason: 'completed',
+    closedBy: { type: 'pr', number: 5, merged: true, base: 'main', repo: 'O/R' },
     prs: [{ number: 5, state: 'merged', merged: true, base: 'main' }]
   });
   const byCommit = graphqlHost(closersReply(closedIssue({ ...pr, closer: { __typename: 'Commit', oid: 'abc' } }))).issueClosers(2);
@@ -94,6 +95,12 @@ test('issueClosers reads the last close: a merged pull request, a commit, or nob
   const byHand = graphqlHost(closersReply(closedIssue({ createdAt: '2026-01-02T00:00:00Z', stateReason: 'NOT_PLANNED', closer: null }))).issueClosers(2);
   assert.deepStrictEqual([byHand.closedBy, byHand.stateReason], [{ type: 'none' }, 'not_planned']);
   assert.strictEqual(graphqlHost(closersReply(closedIssue(null))).issueClosers(2).closedAt, null);
+});
+
+test('issueClosers reports the last reopen of the issue', () => {
+  const event = { createdAt: '2026-01-03T00:00:00Z', stateReason: 'COMPLETED', closer: null };
+  const got = graphqlHost(closersReply(closedIssue(event, [], false, [{ createdAt: '2026-01-02T00:00:00Z' }]))).issueClosers(2);
+  assert.strictEqual(got.reopenedAt, '2026-01-02T00:00:00Z');
 });
 
 test('issueClosers refuses a partial list, a graphql error and a missing issue', () => {

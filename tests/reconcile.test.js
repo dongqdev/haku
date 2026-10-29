@@ -446,3 +446,70 @@ test('a task whose closure was confirmed is no longer reported as closed by hand
   const held = reconcile(treeWith({ 2: [] }));
   assert.deepStrictEqual(held.warnings.filter(w => w.kind === 'closed-without-merged-pr').map(w => w.issue), [2]);
 });
+
+// ---- second review: what reconcile itself closed, and what hides under a hand-closed milestone -----------------
+
+const MERGED_AT = '2026-01-01T00:00:00Z'; // before the close in `answer` (2026-01-02)
+const prNaming = (n, mergedAt = MERGED_AT) => ({ number: 70 + n, body: `Closes #${n}`, headRefName: 'x', closingIssues: [], mergedAt });
+const byReconcile = extra => answer([], { closedBy: { type: 'none' }, ...extra });
+
+test('a task that reconcile closed for a merged pull request stays merged in the next run', () => {
+  const host = fakeHost({
+    issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)],
+    prs: [prNaming(2)],
+    closers: { 2: byReconcile({}) }
+  });
+  assert.deepStrictEqual(reconcile(host).plan.map(p => p.issue), [1]);
+});
+
+test('reopened after the merge and closed by hand (or closed before the merge, or as not planned) is not that', () => {
+  const cases = {
+    'reopened after the merge': byReconcile({ reopenedAt: '2026-01-01T12:00:00Z' }),
+    'closed before the merge': byReconcile({ closedAt: '2025-12-31T00:00:00Z' }),
+    'not planned': byReconcile({ stateReason: 'not_planned' }),
+    'no close event': byReconcile({ closedAt: null })
+  };
+  for (const [name, closer] of Object.entries(cases)) {
+    const host = fakeHost({ issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)], prs: [prNaming(2)], closers: { 2: closer } });
+    assert.deepStrictEqual(reconcile(host).plan, [], name);
+  }
+  // a reopen BEFORE the merge does not matter: the merge came after it
+  const early = fakeHost({ issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)], prs: [prNaming(2)], closers: { 2: byReconcile({ reopenedAt: '2025-12-20T00:00:00Z' }) } });
+  assert.deepStrictEqual(reconcile(early).plan.map(p => p.issue), [1]);
+  // without a merged pull request that names the task there is nothing to vouch for it
+  const none = fakeHost({ issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)], prs: [], closers: { 2: byReconcile({}) } });
+  assert.deepStrictEqual(reconcile(none).plan, []);
+});
+
+test('a pull request of another repository that closed the issue is not this repository\'s work', () => {
+  const closedBy = repo => ({ type: 'pr', number: 5, merged: true, base: 'main', repo });
+  const other = reconcile(treeWith({ 2: answer([mergedPr], { repo: 'o/r', closedBy: closedBy('x/y') }) }));
+  assert.deepStrictEqual(other.plan, []);
+  const same = reconcile(treeWith({ 2: answer([mergedPr], { repo: 'o/r', closedBy: closedBy('O/R') }) }));
+  assert.deepStrictEqual(same.plan.map(p => p.issue), [1]);
+});
+
+test('a still open task under a milestone closed by hand holds the story back', () => {
+  const host = fakeHost({
+    issues: [issue(1, 'story', 'open'), withParent(2, 'milestone', 1), withParent(3, 'task', 2, 'open')],
+    prs: []
+  });
+  const result = reconcile(host);
+  assert.deepStrictEqual(result.plan, []);
+  assert.deepStrictEqual(result.warnings.filter(w => w.kind === 'child-not-done').map(w => [w.issue, w.children]), [[1, [3]]]);
+});
+
+test('a task named by two parents is reported once', () => {
+  const host = fakeHost({
+    issues: [
+      issue(1, 'story', 'open'),
+      withParent(2, 'milestone', 1),
+      issue(4, 'milestone', 'closed', 'Parent: #1\n\n## Children\n- [x] #3 same task'),
+      issue(3, 'task', 'closed', 'Parent: #2')
+    ],
+    prs: [],
+    closers: { 3: [] }
+  });
+  const holds = reconcile(host).warnings.filter(w => w.kind === 'child-closed-without-merge');
+  assert.deepStrictEqual(holds.map(w => [w.issue, w.children]), [[1, [3]]]);
+});
