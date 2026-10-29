@@ -37,7 +37,7 @@ Usage:
   issues.js status [--json] [--repo <owner/repo>]
   issues.js triage [--json] [--repo <owner/repo>]
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
-  issues.js accept-close --issue <N> --reason <text> [--repo <owner/repo>]
+  issues.js accept-close --issue <N> --reason <text> --user-approved [--repo <owner/repo>]
   issues.js pr-body --issue <N>
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
@@ -67,6 +67,7 @@ function parse(argv) {
     else if (arg === '--trust-working-copy') opts.trust = true;
     else if (arg === '--abandon') opts.abandon = true;
     else if (arg === '--discard') opts.discard = true;
+    else if (arg === '--user-approved') opts.userApproved = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else if (VALUE.has(arg)) {
       const value = argv[i + 1];
@@ -228,6 +229,7 @@ function main(argv) {
     }
     case 'accept-close': {
       needIssue(opts);
+      if (!opts.userApproved) throw new Error('--user-approved is required: run accept-close only after the user chose "closed on purpose" for this task');
       acceptClosedTask(host(), opts.issue, opts.reason);
       console.log(`#${opts.issue}: recorded as closed on purpose; reconcile may now roll its parent up`);
       return 0;

@@ -67,3 +67,46 @@ test('without an assignee nothing extra is called', () => {
   assert.strictEqual(host(exec).createIssue(base), 7);
   assert.strictEqual(calls.length, 1);
 });
+
+// ---- closing audit (#25): what the host says about how an issue was closed -----------------------------------
+
+const closersReply = (issue, errors) => JSON.stringify(errors ? { errors } : { data: { repository: { issue } } });
+const graphqlHost = reply => createGitHubHost({ repo: 'o/r', exec: (bin, args) => {
+  assert.deepStrictEqual(args.slice(0, 2), ['api', 'graphql']);
+  return typeof reply === 'function' ? reply(args) : reply;
+} });
+const closedIssue = (event, nodes = [], hasNextPage = false) => ({
+  state: 'CLOSED',
+  closedByPullRequestsReferences: { pageInfo: { hasNextPage }, nodes },
+  timelineItems: { nodes: event ? [event] : [] }
+});
+
+test('issueClosers reads the last close: a merged pull request, a commit, or nobody', () => {
+  const pr = { createdAt: '2026-01-02T00:00:00Z', stateReason: 'COMPLETED', closer: { __typename: 'PullRequest', number: 5, merged: true, baseRefName: 'main' } };
+  const byPr = graphqlHost(closersReply(closedIssue(pr, [{ number: 5, state: 'MERGED', merged: true, baseRefName: 'main' }]))).issueClosers(2);
+  assert.deepStrictEqual(byPr, {
+    state: 'closed', closedAt: '2026-01-02T00:00:00Z', stateReason: 'completed',
+    closedBy: { type: 'pr', number: 5, merged: true, base: 'main' },
+    prs: [{ number: 5, state: 'merged', merged: true, base: 'main' }]
+  });
+  const byCommit = graphqlHost(closersReply(closedIssue({ ...pr, closer: { __typename: 'Commit', oid: 'abc' } }))).issueClosers(2);
+  assert.deepStrictEqual(byCommit.closedBy, { type: 'commit' });
+  const byHand = graphqlHost(closersReply(closedIssue({ createdAt: '2026-01-02T00:00:00Z', stateReason: 'NOT_PLANNED', closer: null }))).issueClosers(2);
+  assert.deepStrictEqual([byHand.closedBy, byHand.stateReason], [{ type: 'none' }, 'not_planned']);
+  assert.strictEqual(graphqlHost(closersReply(closedIssue(null))).issueClosers(2).closedAt, null);
+});
+
+test('issueClosers refuses a partial list, a graphql error and a missing issue', () => {
+  assert.throws(() => graphqlHost(closersReply(closedIssue(null, [], true))).issueClosers(2), /partial list/);
+  assert.throws(() => graphqlHost(closersReply(null, [{ message: 'boom' }])).issueClosers(2), /boom/);
+  assert.throws(() => graphqlHost(closersReply(null)).issueClosers(2), /not found/);
+});
+
+test('listComments keeps the author association and the time of each comment', () => {
+  const exec = (bin, args) => JSON.stringify([{ id: 1, body: 'x', author_association: 'OWNER', created_at: '2026-01-01T00:00:00Z' }, { id: 2, body: 'y' }]);
+  const rows = createGitHubHost({ repo: 'o/r', exec, perPage: 100 }).listComments(3);
+  assert.deepStrictEqual(rows, [
+    { body: 'x', authorAssociation: 'OWNER', createdAt: '2026-01-01T00:00:00Z' },
+    { body: 'y', authorAssociation: 'NONE', createdAt: null }
+  ]);
+});

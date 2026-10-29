@@ -196,24 +196,36 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       withBodyFile(body, file => gh(['issue', 'edit', String(number), ...scope, '--body-file', file]));
     },
 
-    // What closed this issue: every pull request GitHub links to it as the closing one, in any state. A full page may
-    // be cut off, which is an error, not an answer.
+    // How this issue was closed, and by what. The last close event says who closed it now (a reopened and hand-closed
+    // issue must not keep the credit of an earlier merged pull request); the linked pull requests are kept to tell an
+    // open or unmerged one from nothing at all. A full page may be cut off, which is an error, not an answer.
     issueClosers(number) {
       const [owner, name] = repoSlug().split('/');
       const query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state '
-        + 'closedByPullRequestsReferences(first:50,includeClosedPrs:true){pageInfo{hasNextPage} nodes{number state merged baseRefName}}}}}';
+        + 'closedByPullRequestsReferences(first:50,includeClosedPrs:true){pageInfo{hasNextPage} nodes{number state merged baseRefName}} '
+        + 'timelineItems(itemTypes:[CLOSED_EVENT],last:1){nodes{... on ClosedEvent{createdAt stateReason closer{__typename ... on PullRequest{number merged baseRefName} ... on Commit{oid}}}}}}}}';
       const data = JSON.parse(gh(['api', ...apiHost, 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `number=${number}`]));
       if (data.errors && data.errors.length) throw new Error(`closing pull requests of #${number}: ${data.errors[0].message}`);
       const issue = data.data.repository.issue;
       if (!issue) throw new Error(`issue #${number} not found`);
       const refs = issue.closedByPullRequestsReferences;
       if (refs.pageInfo.hasNextPage) throw new Error(`#${number} has more closing pull requests than one page holds; refusing to decide on a partial list`);
-      return { state: String(issue.state).toLowerCase(), prs: refs.nodes.map(p => ({ number: p.number, state: String(p.state).toLowerCase(), merged: Boolean(p.merged), base: p.baseRefName })) };
+      const event = (issue.timelineItems.nodes || [])[0] || null;
+      const closer = event && event.closer ? event.closer : null;
+      return {
+        state: String(issue.state).toLowerCase(),
+        closedAt: event ? event.createdAt : null,
+        stateReason: event && event.stateReason ? String(event.stateReason).toLowerCase() : null,
+        closedBy: !closer ? { type: 'none' }
+          : closer.__typename === 'PullRequest' ? { type: 'pr', number: closer.number, merged: Boolean(closer.merged), base: closer.baseRefName }
+            : { type: 'commit' },
+        prs: refs.nodes.map(p => ({ number: p.number, state: String(p.state).toLowerCase(), merged: Boolean(p.merged), base: p.baseRefName }))
+      };
     },
 
     listComments(number) {
       return restList(`issues/${number}/comments`, '', `comments of #${number}`, c => c.id)
-        .map(c => ({ body: c.body || '', authorAssociation: c.author_association || 'NONE' }));
+        .map(c => ({ body: c.body || '', authorAssociation: c.author_association || 'NONE', createdAt: c.created_at || null }));
     },
 
     commentIssue(number, body) {

@@ -5,7 +5,13 @@ const assert = require('node:assert');
 const { reconcile, describeWarning, acceptClosedTask } = require('../scripts/lib/reconcile');
 
 // Hosts written inline below: every closed task was closed by a merged pull request.
-const closedByMerge = { issueClosers: () => ({ state: 'closed', prs: [{ number: 1, state: 'merged', merged: true, base: 'main' }] }), listComments: () => [] };
+// `closedBy` is who made the LAST close; `prs` are the linked pull requests. A list of pull requests alone is read as
+// "closed by the merged one into main if there is one, else by hand".
+const answer = (prs, extra = {}) => {
+  const merged = prs.find(p => p.merged && p.base === 'main');
+  return { state: 'closed', closedAt: '2026-01-02T00:00:00Z', stateReason: 'completed', prs, closedBy: merged ? { type: 'pr', number: merged.number, merged: true, base: 'main' } : { type: 'none' }, ...extra };
+};
+const closedByMerge = { issueClosers: () => answer([{ number: 1, state: 'merged', merged: true, base: 'main' }]), listComments: () => [] };
 
 // `closers` answers "which pull requests closed this issue" per issue number; an issue it does not name was closed
 // by a merged pull request. A function value throws or returns what the test needs; `comments` per issue.
@@ -16,7 +22,8 @@ function fakeHost({ issues, prs, base = 'main', closers = {}, comments = {} }) {
     issueClosers: n => {
       const c = closers[n];
       if (typeof c === 'function') return c();
-      return { state: 'closed', prs: c || [{ number: 900 + n, state: 'merged', merged: true, base }] };
+      if (c && !Array.isArray(c)) return c;
+      return answer(c || [{ number: 900 + n, state: 'merged', merged: true, base }]);
     },
     listComments: n => comments[n] || [],
     defaultBranch: () => base,
@@ -265,6 +272,9 @@ test('the Children heading is found in any letter case', () => {
 const withParent = (number, type, parent, state = 'closed') => issue(number, type, state, `Parent: #${parent}`);
 const rollupHolds = result => result.warnings.filter(w => w.kind === 'child-closed-without-merge' || w.kind === 'audit-incomplete');
 
+const LATER = '2026-02-01T00:00:00Z';
+const EARLIER = '2025-12-01T00:00:00Z';
+
 function treeWith(closers, comments) {
   return fakeHost({
     issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)],
@@ -308,10 +318,10 @@ test('the host cannot be asked: the audit is incomplete and nothing rolls up', (
 
 test('a task closed on purpose is allowed when a repository writer recorded it, not when anyone else did', () => {
   const marker = '<!-- haku:accepted-close -->\nAlready fixed in another change.';
-  const trusted = reconcile(treeWith({ 2: [] }, { 2: [{ body: marker, authorAssociation: 'OWNER' }] }));
+  const trusted = reconcile(treeWith({ 2: [] }, { 2: [{ body: marker, authorAssociation: 'OWNER', createdAt: LATER }] }));
   assert.deepStrictEqual(trusted.plan.map(p => p.issue), [1]);
   for (const who of ['NONE', 'CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR']) {
-    const stranger = reconcile(treeWith({ 2: [] }, { 2: [{ body: marker, authorAssociation: who }] }));
+    const stranger = reconcile(treeWith({ 2: [] }, { 2: [{ body: marker, authorAssociation: who, createdAt: LATER }] }));
     assert.deepStrictEqual(stranger.plan, [], who);
   }
 });
@@ -351,17 +361,8 @@ test('an accepted close is read back by reconcile through the same marker', () =
   const posted = [];
   const tree = [issue(1, 'story', 'open'), withParent(2, 'task', 1)];
   acceptClosedTask({ getIssue: () => tree[1], commentIssue: (n, body) => posted.push(body) }, 2, 'not needed');
-  const result = reconcile(fakeHost({ issues: tree, prs: [], closers: { 2: [] }, comments: { 2: [{ body: posted[0], authorAssociation: 'COLLABORATOR' }] } }));
+  const result = reconcile(fakeHost({ issues: tree, prs: [], closers: { 2: [] }, comments: { 2: [{ body: posted[0], authorAssociation: 'COLLABORATOR', createdAt: LATER }] } }));
   assert.deepStrictEqual(result.plan.map(p => p.issue), [1]);
-});
-
-test('a task with a merged pull request in this run is never looked up again, even when lookups fail', () => {
-  const host = fakeHost({
-    issues: [issue(1, 'story', 'open'), withParent(2, 'task', 1)],
-    prs: [{ number: 10, body: 'Closes #2', headRefName: 'x', closingIssues: [] }],
-    closers: { 2: () => { throw new Error('network'); } }
-  });
-  assert.deepStrictEqual(reconcile(host).plan.map(p => p.issue), [1]);
 });
 
 test('only tasks are audited: a closed milestone with nothing linked does not hold its story back', () => {
@@ -371,4 +372,77 @@ test('only tasks are audited: a closed milestone with nothing linked does not ho
     closers: { 2: [] }
   });
   assert.deepStrictEqual(reconcile(host).plan.map(p => p.issue), [1]);
+});
+
+// ---- findings of the review: the last close decides, and nothing hides under a hand-closed parent ---------------
+
+const mergedPr = { number: 5, state: 'merged', merged: true, base: 'main' };
+
+test('reopened after a merged pull request and closed again by hand: held back', () => {
+  const result = reconcile(treeWith({ 2: answer([mergedPr], { closedBy: { type: 'none' } }) }));
+  assert.deepStrictEqual(result.plan, []);
+  assert.strictEqual(rollupHolds(result)[0].states[2], 'none');
+});
+
+test('closed as not planned or duplicate, or by a commit, is not completed work', () => {
+  for (const extra of [{ stateReason: 'not_planned' }, { stateReason: 'duplicate' }, { closedBy: { type: 'commit' } }]) {
+    const result = reconcile(treeWith({ 2: answer([mergedPr], extra) }));
+    assert.deepStrictEqual(result.plan, [], JSON.stringify(extra));
+  }
+  // a merged pull request into a branch other than the default one does not count either
+  const other = reconcile(treeWith({ 2: answer([{ ...mergedPr, base: 'dev' }], { closedBy: { type: 'pr', number: 5, merged: true, base: 'dev' } }) }));
+  assert.deepStrictEqual(other.plan, []);
+});
+
+test('the closed-on-purpose record counts only when it is the first line and was made after the last close', () => {
+  const body = '<!-- haku:accepted-close -->\nnot needed';
+  const cases = [
+    [{ body, authorAssociation: 'OWNER', createdAt: LATER }, true],
+    [{ body, authorAssociation: 'OWNER', createdAt: EARLIER }, false],
+    [{ body, authorAssociation: 'OWNER', createdAt: null }, false],
+    [{ body: `Quoting the rule:\n${body}`, authorAssociation: 'OWNER', createdAt: LATER }, false],
+    [{ body: '```\n<!-- haku:accepted-close -->\n```', authorAssociation: 'OWNER', createdAt: LATER }, false],
+    [{ body: '> <!-- haku:accepted-close -->', authorAssociation: 'OWNER', createdAt: LATER }, false]
+  ];
+  for (const [comment, ok] of cases) {
+    const result = reconcile(treeWith({ 2: [] }, { 2: [comment] }));
+    assert.strictEqual(result.plan.length > 0, ok, JSON.stringify(comment));
+  }
+});
+
+test('a failing comment lookup makes the audit incomplete, not a pass', () => {
+  const host = treeWith({ 2: [] });
+  host.listComments = () => { throw new Error('network'); };
+  const result = reconcile(host);
+  assert.deepStrictEqual(result.plan, []);
+  assert.strictEqual(rollupHolds(result)[0].kind, 'audit-incomplete');
+});
+
+test('a child that only the Children checklist names is audited too', () => {
+  const host = fakeHost({
+    issues: [issue(1, 'story', 'open', '## Children\n- [x] #2 a\n- [x] #3 b'), withParent(2, 'task', 1), issue(3, 'task', 'closed', 'no parent line')],
+    prs: [],
+    closers: { 3: [] }
+  });
+  const result = reconcile(host);
+  assert.deepStrictEqual(result.plan, []);
+  assert.deepStrictEqual(rollupHolds(result)[0].children, [3]);
+});
+
+test('a milestone closed by hand does not hide the hand-closed task under it from its story', () => {
+  const host = fakeHost({
+    issues: [issue(1, 'story', 'open'), withParent(2, 'milestone', 1), withParent(3, 'task', 2)],
+    prs: [],
+    closers: { 3: [] }
+  });
+  const result = reconcile(host);
+  assert.deepStrictEqual(result.plan, []);
+  assert.deepStrictEqual(rollupHolds(result).map(w => [w.issue, w.children]), [[1, [3]]]);
+});
+
+test('a task whose closure was confirmed is no longer reported as closed by hand', () => {
+  const merged = reconcile(treeWith({}));
+  assert.deepStrictEqual(merged.warnings.filter(w => w.kind === 'closed-without-merged-pr'), []);
+  const held = reconcile(treeWith({ 2: [] }));
+  assert.deepStrictEqual(held.warnings.filter(w => w.kind === 'closed-without-merged-pr').map(w => w.issue), [2]);
 });

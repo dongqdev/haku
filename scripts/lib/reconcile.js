@@ -8,7 +8,9 @@ const {
   ACCEPTED_CLOSE_MARKER
 } = require('./model');
 
-// Who may say "this task was closed on purpose": the people who can write to the repository.
+// Who may leave the "closed on purpose" record: people with write access. The agent works under the user's own
+// login and counts as one of them, so this keeps strangers out; that the user was really asked is the build
+// skill's rule, which accept-close backs with an explicit --user-approved flag.
 const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 // Close what merged but stayed open. Evidence is the host's merge state of a PR
@@ -17,20 +19,29 @@ const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 // explicit closing keyword, or the task/<issue>-slug branch convention.
 // Story/milestone issues are closed only by roll-up (every child closed).
 // How a closed task was closed, from what the host says (never from the wording of a comment alone):
-//   merged        a merged pull request into the default branch is tied to it
-//   accepted      a repository writer recorded that it was closed on purpose (marker comment)
-//   open-pr       only an open pull request is linked
-//   closed-pr     only pull requests closed without merging, or merged into another branch
-//   none          nothing is linked: it was closed by hand
+//   merged        its LAST close was made by a merged pull request into the default branch, as completed work
+//   accepted      a repository writer recorded, after that last close, that it was closed on purpose
+//   open-pr       not closed by merged work; an open pull request is linked
+//   closed-pr     not closed by merged work; linked pull requests were closed unmerged or merged elsewhere
+//   none          not closed by merged work and nothing is linked (closed by hand, by a commit, as not planned or
+//                 duplicate, or reopened and closed again by hand)
 //   unknown       the host could not be asked, so nothing is claimed
+// The last close decides: an earlier merged pull request does not vouch for a task that was reopened and closed again.
 function auditClosure(host, number, base) {
   try {
-    const { prs } = host.issueClosers(number);
-    if (prs.some(p => p.merged && p.base === base)) return 'merged';
-    const accepted = host.listComments(number).some(c => TRUSTED.has(c.authorAssociation) && String(c.body).includes(ACCEPTED_CLOSE_MARKER));
+    const found = host.issueClosers(number);
+    const by = found.closedBy || { type: 'none' };
+    const completed = !found.stateReason || found.stateReason === 'completed';
+    if (by.type === 'pr' && by.merged && by.base === base && completed) return 'merged';
+    // The record counts only when it is the first line of a comment made after the last close.
+    const closedAt = found.closedAt ? Date.parse(found.closedAt) : null;
+    const accepted = host.listComments(number).some(c => TRUSTED.has(c.authorAssociation)
+      && /^\s*<!-- haku:accepted-close -->[ \t]*(\r?\n|$)/.test(String(c.body))
+      && (closedAt === null || (c.createdAt && Date.parse(c.createdAt) >= closedAt)));
     if (accepted) return 'accepted';
-    if (prs.some(p => p.state === 'open')) return 'open-pr';
-    return prs.length ? 'closed-pr' : 'none';
+    if (found.prs.some(p => p.state === 'open')) return 'open-pr';
+    // A pull request merged into the default branch that is not the last closer was followed by a reopen and a hand close.
+    return found.prs.some(p => (p.state === 'closed' && !p.merged) || (p.merged && p.base !== base)) ? 'closed-pr' : 'none';
   } catch (err) {
     return 'unknown';
   }
@@ -86,8 +97,23 @@ function reconcile(host, { apply = false } = {}) {
   // A task closed without a merged pull request that reconcile knows of is asked about once; the answer is kept.
   const closures = new Map();
   const closureOf = issue => {
-    if (!closures.has(issue.number)) closures.set(issue.number, referenced.has(issue.number) ? 'merged' : auditClosure(host, issue.number, base));
+    if (!closures.has(issue.number)) closures.set(issue.number, auditClosure(host, issue.number, base));
     return closures.get(issue.number);
+  };
+  // Every task under an issue: those with its Parent line, those only its Children checklist names, and the tasks of
+  // milestones below it (a milestone closed by hand must not hide what is under it).
+  const tasksUnder = (issue, seen = new Set()) => {
+    if (seen.has(issue.number)) return [];
+    seen.add(issue.number);
+    const below = new Map();
+    for (const k of children.get(issue.number) || []) below.set(k.number, k);
+    for (const n of checklistNumbers(issue)) if (byNumber.has(n)) below.set(n, byNumber.get(n));
+    const tasks = [];
+    for (const k of below.values()) {
+      if (issueType(k) === 'task') tasks.push(k);
+      else tasks.push(...tasksUnder(k, seen));
+    }
+    return tasks;
   };
   let changed = true;
   while (changed) {
@@ -114,7 +140,7 @@ function reconcile(host, { apply = false } = {}) {
       }
       // Every task under it must have been closed by merged work (or on purpose, on record). A hand-closed task
       // would otherwise make the story look finished although nothing was built.
-      const unverified = kids.filter(k => issueType(k) === 'task' && k.state === 'closed' && !['merged', 'accepted'].includes(closureOf(k)));
+      const unverified = tasksUnder(issue).filter(k => k.state === 'closed' && !['merged', 'accepted'].includes(closureOf(k)));
       if (unverified.length) {
         const states = Object.fromEntries(unverified.map(k => [k.number, closureOf(k)]));
         const incomplete = unverified.some(k => states[k.number] === 'unknown');
@@ -137,7 +163,8 @@ function reconcile(host, { apply = false } = {}) {
   }
 
   for (const issue of issues) {
-    if (issueType(issue) === 'task' && issue.state === 'closed' && !referenced.has(issue.number)) {
+    // A closure the audit confirmed (merged or accepted) is not a hand close any more.
+    if (issueType(issue) === 'task' && issue.state === 'closed' && !referenced.has(issue.number) && !['merged', 'accepted'].includes(closures.get(issue.number))) {
       warnings.push({ kind: 'closed-without-merged-pr', issue: issue.number });
     }
   }

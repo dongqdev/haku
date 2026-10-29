@@ -45,3 +45,9 @@ test('pr-check refuses a --pr that is not a plain positive number', () => {
     assert.match(r.stderr, /pull request number|needs a value/, bad);
   }
 });
+
+test('accept-close refuses to run without --user-approved', () => {
+  const r = run('accept-close', '--issue', '3', '--reason', 'not needed');
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /--user-approved/);
+});
