@@ -10,6 +10,8 @@ const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { skeleton, checkBody } = require('./lib/pr-body');
+const { buildStatus, renderStatus } = require('./lib/status');
+const { buildTriage, renderTriage } = require('./lib/triage');
 
 const HELP = `haku issues
 
@@ -23,6 +25,9 @@ Usage:
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
   issues.js worker-list [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon]
+  issues.js status [--json] [--repo <owner/repo>]
+  issues.js triage [--json] [--repo <owner/repo>]
+  issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js pr-body --issue <N>
   issues.js pr-check --issue <N> --file <body.md>
   issues.js branch --issue <N> --title <text>
@@ -35,7 +40,7 @@ done-check    Exit 0 only when a worker may be deleted.
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -144,6 +149,23 @@ function main(argv) {
         return 0;
       }
       out(removeWorker({ cwd, issue: opts.issue, gate: doneCheck(host(), opts.issue), deleteRemote: true }));
+      return 0;
+    }
+    case 'status': {
+      const s = buildStatus(host().listIssues(), listWorkers(opts.cwd || process.cwd()));
+      if (opts.json) out(s); else process.stdout.write(renderStatus(s));
+      return 0;
+    }
+    case 'triage': {
+      const t = buildTriage(host().listIssues());
+      if (opts.json) out(t); else process.stdout.write(renderTriage(t));
+      return 0;
+    }
+    case 'issue-close': {
+      needIssue(opts);
+      if (!opts.reason || !opts.reason.trim()) throw new Error('--reason <text> is required: say why the issue is closed');
+      host().closeIssue(opts.issue, `Closed by haku triage: ${opts.reason.trim()}`);
+      console.log(`#${opts.issue} closed`);
       return 0;
     }
     case 'pr-body':

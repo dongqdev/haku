@@ -4,7 +4,7 @@
 
 **HAKU** = **H**arness **A**ssistant **K**eeping **U**sers in the loop. A small, loud guard dog for your Claude Code work: the user decides and merges, the assistant keeps issues, workers and checks in line.
 
-Personal cross-platform harness for Claude Code, built on ideas from [ECC](https://github.com/affaan-m/ECC) (MIT).
+Personal cross-platform harness for Claude Code. The ideas of per-task worktree workers, issue-based coordination and a merge gate come from [ECC](https://github.com/affaan-m/ECC) (MIT); the code is written from scratch and contains none of ECC's.
 Work is tracked as Git issues; a planning session becomes the orchestrator and runs one worker per task.
 Status: **0.1.0, GitHub + Linux first.** GitLab and Windows/macOS verification are not done yet.
 
@@ -20,9 +20,11 @@ Use the HTTPS URL: the `owner/repo` shorthand resolves to SSH, which fails for p
 Then in the repository you want to work on:
 
 ```
-/haku:setup         # checks, plan, approval, setup PR
+/haku:setup         # once per repository: checks, plan, approval, setup PR
 /haku:plan          # goal -> draft -> approval -> issues -> build
 ```
+
+You normally type only these two. `plan` hands a vague goal to `sniff` first and continues into `build` after you approve the plan; type `build` yourself only to resume a story after losing the session. Anytime: `status` (read-only view of the work), `triage` (sort open issues that belong to no story), `retro` (turn what went wrong into fixes for haku).
 
 ## Flow
 
@@ -60,7 +62,7 @@ The owner of a story, milestone or task is the host's **assignee** (`assignee` i
 
 ```
 .claude-plugin/   plugin + marketplace manifests
-skills/           setup, plan, build
+skills/           setup, sniff, plan, build, status, triage, retro
 agents/           worker
 scripts/          issues.js (CLI) and lib/ (model, publish, reconcile, verify, done-gate, worker, github-host)
 tests/            node --test tests/*.test.js

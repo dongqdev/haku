@@ -34,6 +34,12 @@ function stripNonClaims(text) {
     .replace(/^\s*>.*$/gm, '');
 }
 
+// "Depends-On: #3, #4" -> [3, 4] (the body line publish writes for dependent tasks).
+function dependsOn(issue) {
+  const m = stripNonClaims(issue.body).match(/^Depends-On:\s*(.+)$/im);
+  return m ? [...m[1].matchAll(/#(\d+)/g)].map(x => Number(x[1])) : [];
+}
+
 function parentOf(issue) {
   const m = stripNonClaims(issue.body).match(/^Parent:\s*#(\d+)\s*$/im);
   return m ? Number(m[1]) : null;
@@ -91,6 +97,7 @@ module.exports = {
   issueType,
   issueOwner,
   parentOf,
+  dependsOn,
   closingRefsFromText,
   issueFromBranch,
   prRefs,
