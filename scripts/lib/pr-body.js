@@ -40,12 +40,13 @@ function maskFences(text) {
   }).join('\n');
 }
 
-// What a reader would take as the author's own words: no code (fenced, indented, inline) and no quotes.
+// What a reader would take as the author's own words: no fenced or inline code, no quotes. Indented
+// code is deliberately not stripped: inside a list a 4-space line is a sub-item, not code, so dropping
+// it would hide a real closing line and reject honest sub-lists.
 function proseOf(text) {
   return String(text || '')
     .replace(/```[\s\S]*?```/g, '')
     .replace(/~~~[\s\S]*?~~~/g, '')
-    .replace(/^(?: {4}|\t).*$/gm, '')
     .replace(/`[^`\n]*`/g, '')
     .replace(/^\s*>.*$/gm, '');
 }

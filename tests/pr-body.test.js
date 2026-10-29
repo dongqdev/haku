@@ -74,8 +74,8 @@ test('Korean inside a code block or a quote does not satisfy the Korean check', 
   assert.match(checkBody(quoted, 3).problems.join('\n'), /"## 테스트" 항목은 한글/);
 });
 
-test('a closing line in ~~~ fences, indented code or inline code does not count', () => {
-  for (const wrapped of ['~~~\nCloses #3\n~~~', '    Closes #3', '`Closes #3`']) {
+test('a closing line in ~~~ fences or inline code does not count', () => {
+  for (const wrapped of ['~~~\nCloses #3\n~~~', '`Closes #3`']) {
     const body = filled(3).replace('Closes #3', wrapped);
     assert.match(checkBody(body, 3).problems.join('\n'), /Closes #3.*없습니다/, wrapped);
   }
@@ -88,4 +88,18 @@ test('a heading inside a code fence is not a section', () => {
 
 test('CRLF line endings are accepted', () => {
   assert.deepStrictEqual(checkBody(filled(3).replace(/\n/g, '\r\n'), 3), { ok: true, problems: [] });
+});
+
+test('a closing reference in an indented sub-list item still counts', () => {
+  for (const extra of ['- 참고\n    Closes #9', '- 주요 변경 사항을 정리했습니다\n    - 세부: Closes #9 도 함께 처리', '- 참고\n\tFixes #9']) {
+    assert.match(checkBody(withClosing(extra), 3).problems.join('\n'), /#9/, extra);
+  }
+});
+
+test('Korean written in indented sub-list items counts', () => {
+  const body = filled(3, {
+    '변경 내용': '- 코드\n    - pr-body.js의 한글 검사를 항목별로 바꿈\n    - 닫는 참조 형식 검사 추가',
+    '이유': '1. 점검 강화\n    1. 항목마다 한글 다섯 자 이상 요구'
+  });
+  assert.deepStrictEqual(checkBody(body, 3), { ok: true, problems: [] });
 });
