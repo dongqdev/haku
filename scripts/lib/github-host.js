@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { BASE_LABEL, ownerLabel, labelStyle } = require('./model');
 const { readAllPages, readAllCursors, readStable } = require('./paginate');
+const { classifyProtection, classifyRulesets } = require('./protection');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
@@ -110,6 +111,27 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       // The repository comes with every reference: "#20" of another repository is not this repository's #20.
       const repoOf = r => (r.repository && r.repository.owner && r.repository.name ? `${r.repository.owner.login}/${r.repository.name}` : null);
       return { number: pr.number, state: String(pr.state).toLowerCase(), repo: repoSlug(), issues: refs.map(r => ({ number: r.number, repo: repoOf(r) })) };
+    },
+
+    // Protection of a branch: protected, unprotected, unavailable (plan limit) or unknown. gh exits non-zero for
+    // the 403 and 404 answers; their text decides. Anything it cannot read is "unknown", never "protected".
+    branchProtection(branch) {
+      const route = `repos/${repoSlug()}/branches/${String(branch).split('/').map(encodeURIComponent).join('/')}/protection`;
+      try {
+        return classifyProtection({ ok: true, body: gh(['api', ...apiHost, route]) });
+      } catch (err) {
+        // gh prints the body of an error answer on stdout and its own line on stderr; the failed command line (in
+        // `message`) is left out so the branch name can never be mistaken for the answer.
+        const text = [err && err.stdout, err && err.stderr].filter(Boolean).map(String).join('\n');
+        const state = classifyProtection({ ok: false, text });
+        if (state !== 'unprotected') return state;
+        // No classic rule: a ruleset may guard the branch instead.
+        try {
+          return classifyRulesets(gh(['api', ...apiHost, `repos/${repoSlug()}/rules/branches/${String(branch).split('/').map(encodeURIComponent).join('/')}`])) || state;
+        } catch (e) {
+          return state;
+        }
+      }
     },
 
     // Every file a pull request changes, read through all pages. GitHub lists at most 3000; a list that reaches it

@@ -42,13 +42,15 @@ If the current folder is not inside a Git repository with an `origin` (`git rev-
 | Git repo with `origin` | `git remote get-url origin` | stop |
 | GitHub CLI logged in | `gh auth status` | tell the user to run `gh auth login` themselves; do not handle credentials |
 | Default branch | `gh repo view --json defaultBranchRef` | stop |
-| Default-branch protection | `gh api repos/{owner}/{repo}/branches/<base>/protection` (404 = none) | report; recommend "PR required, no direct push" - never change it silently |
+| Default-branch protection | `issues.js branch-protection` (read-only) | report its state in plain words: `protected` (rules require a pull request and apply to administrators too) / `weak` (rules exist but are too loose) / `ruleset` (guarded by a ruleset whose bypass list cannot be seen) / `unprotected` (can be turned on in the repository settings) / `unavailable` (the plan does not allow it: private repository on a free plan) / `unknown` (could not be checked). Never change the setting silently |
 | `.haku/verify.json` on the default branch | `git show <base>:.haku/verify.json` | propose a starter file (step 3) |
 | Config scope | is `CLAUDE_CONFIG_DIR` set, and where does it point? | state which settings folder this install affects |
 
 ## 2. Assignee
 
 The assignee is the host account that owns the work. Default to the `gh api user --jq .login` value; ask the user to confirm or change it with a choice question. Store it as `assignee` in `.haku/config.json` together with `maxWorkers` (default 2) and `mergeMode` (`approve-each`).
+
+`mergeMode` is `approve-each` unless the preflight says the default branch is `protected`. When the state is `unprotected`, `unavailable` or `unknown`, do not offer `auto-when-verified` at all, say in one sentence why (the `reason` that `issues.js branch-protection` prints), and show the substitute safeguards it lists (required check CI, workers never push to the default branch, the checks before every merge). Tell the user that if protection becomes possible later (a public repository, a paid plan, or turning it on in the settings), `auto-when-verified` can be enabled then.
 
 ## 3. Plan, then apply
 

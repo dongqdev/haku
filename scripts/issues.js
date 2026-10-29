@@ -19,6 +19,7 @@ const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 const { renderChanges } = require('./lib/weaken');
 const { prConfigChanges } = require('./lib/pr-config');
+const { checkProtection, renderProtection } = require('./lib/protection');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
@@ -41,6 +42,7 @@ Usage:
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js accept-close --issue <N> --reason <text> --user-approved [--repo <owner/repo>]
   issues.js pr-body --issue <N>
+  issues.js branch-protection [--mode <approve-each|auto-when-verified> | --story <N>] [--json] [--repo <owner/repo>]
   issues.js pr-config-changes --pr <number> [--issue <N>] [--json] [--repo <owner/repo>]
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
@@ -55,13 +57,15 @@ accept-close  Records that the user closed a task on purpose without a merged PR
 verify        Exit 0 = pass, 1 = fail, 2 = review needed (see reasons).
 done-check    Exit 0 only when a worker may be deleted.
 project-names Checks candidate repository names against the account's existing repositories (read-only).
+branch-protection  Reports whether the default branch is protected (protected, unprotected, unavailable = plan limit, unknown)
+              and which merge modes are allowed: without protection only approve-each. Read-only.
 pr-config-changes  Lists the files of a pull request that could weaken its own checks (lint, CI, test runner, .haku); a warning for the
               merge-approval screen, never a block. Out-of-scope files (not in the task's Scope) come first.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -83,6 +87,7 @@ function parse(argv) {
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
+  if (opts.story !== undefined) opts.story = Number(opts.story);
   if (opts.pr !== undefined) opts.pr = /^[1-9]\d*$/.test(opts.pr) ? Number(opts.pr) : NaN;
   return opts;
 }
@@ -250,6 +255,18 @@ function main(argv) {
       needIssue(opts);
       process.stdout.write(skeleton(opts.issue));
       return 0;
+    case 'branch-protection': {
+      const cfg = readConfig(opts.cwd || process.cwd());
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      // Exit 0: the requested merge mode may be used. Exit 3: it may not (asking is the answer).
+      const { report, exitCode } = checkProtection({
+        host: { getIssue: n => host().getIssue(n), branchProtection: b => host().branchProtection(b), defaultBranch: () => host().defaultBranch() },
+        mode: opts.mode, story: opts.story, repoGiven: Boolean(opts.repo), configMode: cfg.config.mergeMode,
+        warn: m => console.error(`[haku] warning: ${m}`)
+      });
+      if (opts.json) out(report); else process.stdout.write(renderProtection(report));
+      return exitCode;
+    }
     case 'pr-config-changes': {
       if (opts.pr === undefined || !(Number.isInteger(opts.pr) && opts.pr > 0)) throw new Error('--pr <number> is required');
       if (opts.issue !== undefined && !(Number.isInteger(opts.issue) && opts.issue > 0)) throw new Error('--issue needs an issue number');
