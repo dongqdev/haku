@@ -4,14 +4,38 @@ const {
   issueType,
   parentOf,
   prRefs,
-  checklistNumbers
+  checklistNumbers,
+  ACCEPTED_CLOSE_MARKER
 } = require('./model');
+
+// Who may say "this task was closed on purpose": the people who can write to the repository.
+const TRUSTED = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 // Close what merged but stayed open. Evidence is the host's merge state of a PR
 // into the default branch, never the wording of a PR body alone: a task is closed
 // only when a merged PR is tied to it by the host's own closing-link data, an
 // explicit closing keyword, or the task/<issue>-slug branch convention.
 // Story/milestone issues are closed only by roll-up (every child closed).
+// How a closed task was closed, from what the host says (never from the wording of a comment alone):
+//   merged        a merged pull request into the default branch is tied to it
+//   accepted      a repository writer recorded that it was closed on purpose (marker comment)
+//   open-pr       only an open pull request is linked
+//   closed-pr     only pull requests closed without merging, or merged into another branch
+//   none          nothing is linked: it was closed by hand
+//   unknown       the host could not be asked, so nothing is claimed
+function auditClosure(host, number, base) {
+  try {
+    const { prs } = host.issueClosers(number);
+    if (prs.some(p => p.merged && p.base === base)) return 'merged';
+    const accepted = host.listComments(number).some(c => TRUSTED.has(c.authorAssociation) && String(c.body).includes(ACCEPTED_CLOSE_MARKER));
+    if (accepted) return 'accepted';
+    if (prs.some(p => p.state === 'open')) return 'open-pr';
+    return prs.length ? 'closed-pr' : 'none';
+  } catch (err) {
+    return 'unknown';
+  }
+}
+
 function reconcile(host, { apply = false } = {}) {
   const base = host.defaultBranch();
   const issues = host.listIssues();
@@ -59,6 +83,12 @@ function reconcile(host, { apply = false } = {}) {
   // reported once it is final: a parent that is rolled up in a later pass is not held back after all.
   const holds = new Map();
   const isDone = issue => issue.state === 'closed' || planned.has(issue.number);
+  // A task closed without a merged pull request that reconcile knows of is asked about once; the answer is kept.
+  const closures = new Map();
+  const closureOf = issue => {
+    if (!closures.has(issue.number)) closures.set(issue.number, referenced.has(issue.number) ? 'merged' : auditClosure(host, issue.number, base));
+    return closures.get(issue.number);
+  };
   let changed = true;
   while (changed) {
     changed = false;
@@ -80,6 +110,15 @@ function reconcile(host, { apply = false } = {}) {
       const open = named.filter(n => !isDone(byNumber.get(n)));
       if (open.length) {
         holds.set(issue.number, { kind: 'child-not-done', issue: issue.number, children: open });
+        continue;
+      }
+      // Every task under it must have been closed by merged work (or on purpose, on record). A hand-closed task
+      // would otherwise make the story look finished although nothing was built.
+      const unverified = kids.filter(k => issueType(k) === 'task' && k.state === 'closed' && !['merged', 'accepted'].includes(closureOf(k)));
+      if (unverified.length) {
+        const states = Object.fromEntries(unverified.map(k => [k.number, closureOf(k)]));
+        const incomplete = unverified.some(k => states[k.number] === 'unknown');
+        holds.set(issue.number, { kind: incomplete ? 'audit-incomplete' : 'child-closed-without-merge', issue: issue.number, children: unverified.map(k => k.number), states });
         continue;
       }
       holds.delete(issue.number);
@@ -118,8 +157,20 @@ function reconcile(host, { apply = false } = {}) {
 // run --json to learn which issue holds a parent back.
 function describeWarning(w) {
   const subject = w.issue ? `#${w.issue}` : `PR #${w.pr}`;
-  const children = w.children ? ` (children: ${w.children.map(n => `#${n}`).join(', ')})` : '';
+  const name = n => (w.states && w.states[n] ? `#${n} ${w.states[n]}` : `#${n}`);
+  const children = w.children ? ` (children: ${w.children.map(name).join(', ')})` : '';
   return `${w.kind} ${subject}${children}`;
 }
 
-module.exports = { reconcile, describeWarning };
+// Record that the user decided a task was closed on purpose (already fixed, no longer needed) although no merged
+// pull request closed it. Only a closed task qualifies, and a reason is required; the marker comment is what
+// lets reconcile roll the parent up. The caller asks the user first.
+function acceptClosedTask(host, number, reason) {
+  if (!reason || !String(reason).trim()) throw new Error('a reason is required: say why this task was closed without a merged pull request');
+  const issue = host.getIssue(number);
+  if (issueType(issue) !== 'task') throw new Error(`#${number} is not a task; only a task can be accepted as closed on purpose`);
+  if (issue.state !== 'closed') throw new Error(`#${number} is still open; close it first (the decision is about a task that is already closed)`);
+  host.commentIssue(number, `${ACCEPTED_CLOSE_MARKER}\nClosed on purpose, without a merged pull request: ${String(reason).trim()}`);
+}
+
+module.exports = { reconcile, describeWarning, acceptClosedTask };

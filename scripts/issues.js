@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { createGitHubHost } = require('./lib/github-host');
-const { reconcile, describeWarning } = require('./lib/reconcile');
+const { reconcile, describeWarning, acceptClosedTask } = require('./lib/reconcile');
 const { publish } = require('./lib/publish');
 const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
@@ -37,6 +37,7 @@ Usage:
   issues.js status [--json] [--repo <owner/repo>]
   issues.js triage [--json] [--repo <owner/repo>]
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
+  issues.js accept-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js pr-body --issue <N>
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
@@ -45,7 +46,9 @@ Usage:
 
 publish       Dry-run by default; --apply creates the story/milestone/task issues.
               Progress is kept in <draft>.map.json so an interrupted run resumes.
-reconcile     Dry-run by default; --apply closes merged-but-open tasks and rolls up.
+reconcile     Dry-run by default; --apply closes merged-but-open tasks and rolls up. A parent whose closed task has no
+              merged pull request (open PR only, closed PR only, closed by hand, or not checkable) is held back.
+accept-close  Records that the user closed a task on purpose without a merged PR, so its parent may roll up.
 verify        Exit 0 = pass, 1 = fail, 2 = review needed (see reasons).
 done-check    Exit 0 only when a worker may be deleted.
 project-names Checks candidate repository names against the account's existing repositories (read-only).
@@ -221,6 +224,12 @@ function main(argv) {
     case 'triage': {
       const t = buildTriage(host().listBacklog());
       if (opts.json) out(t); else process.stdout.write(renderTriage(t));
+      return 0;
+    }
+    case 'accept-close': {
+      needIssue(opts);
+      acceptClosedTask(host(), opts.issue, opts.reason);
+      console.log(`#${opts.issue}: recorded as closed on purpose; reconcile may now roll its parent up`);
       return 0;
     }
     case 'issue-close': {

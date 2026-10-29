@@ -196,8 +196,24 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       withBodyFile(body, file => gh(['issue', 'edit', String(number), ...scope, '--body-file', file]));
     },
 
+    // What closed this issue: every pull request GitHub links to it as the closing one, in any state. A full page may
+    // be cut off, which is an error, not an answer.
+    issueClosers(number) {
+      const [owner, name] = repoSlug().split('/');
+      const query = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){state '
+        + 'closedByPullRequestsReferences(first:50,includeClosedPrs:true){pageInfo{hasNextPage} nodes{number state merged baseRefName}}}}}';
+      const data = JSON.parse(gh(['api', ...apiHost, 'graphql', '-f', `query=${query}`, '-f', `owner=${owner}`, '-f', `name=${name}`, '-F', `number=${number}`]));
+      if (data.errors && data.errors.length) throw new Error(`closing pull requests of #${number}: ${data.errors[0].message}`);
+      const issue = data.data.repository.issue;
+      if (!issue) throw new Error(`issue #${number} not found`);
+      const refs = issue.closedByPullRequestsReferences;
+      if (refs.pageInfo.hasNextPage) throw new Error(`#${number} has more closing pull requests than one page holds; refusing to decide on a partial list`);
+      return { state: String(issue.state).toLowerCase(), prs: refs.nodes.map(p => ({ number: p.number, state: String(p.state).toLowerCase(), merged: Boolean(p.merged), base: p.baseRefName })) };
+    },
+
     listComments(number) {
-      return restList(`issues/${number}/comments`, '', `comments of #${number}`, c => c.id).map(c => ({ body: c.body || '' }));
+      return restList(`issues/${number}/comments`, '', `comments of #${number}`, c => c.id)
+        .map(c => ({ body: c.body || '', authorAssociation: c.author_association || 'NONE' }));
     },
 
     commentIssue(number, body) {

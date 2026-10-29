@@ -33,7 +33,7 @@ You normally type only these two. `plan` hands a vague goal to `sniff` first and
 2. `build` starts one worker per ready task (own worktree + `task/<N>-slug` branch, max 2 by default).
 3. Each task is verified by tier: **T1** Linux automatic, **T2** Windows/macOS automatic, **T3** measurement document done by the user.
 4. Merging needs the user's approval per PR (the screen lists the issues that will close). Automatic merging exists only as an explicit per-story opt-in for verified T1/T2 work.
-5. After the merge: verification on the default branch, `reconcile` closes merged-but-open tasks and rolls up milestones and stories, then the worker is deleted - only if its summary and passing verification are recorded.
+5. After the merge: verification on the default branch, `reconcile` closes merged-but-open tasks and rolls up milestones and stories, then the worker is deleted - only if its summary and passing verification are recorded. `reconcile` does not roll a story or milestone up over a task that was closed without a merged pull request (closed by hand, only an open or an unmerged pull request, or not checkable): it reports the task and why, and the user decides with a choice question; `issues.js accept-close --issue N --reason <why>` records a task closed on purpose and lets its parent roll up.
 
 ## Releases
 

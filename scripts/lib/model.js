@@ -121,6 +121,8 @@ function issueFromBranch(branch) {
 }
 
 const SUMMARY_MARKER = '<!-- haku:worker-summary -->';
+// Written when the user decides a task was closed on purpose without a merged pull request.
+const ACCEPTED_CLOSE_MARKER = '<!-- haku:accepted-close -->';
 const VERIFIED_PREFIX = '<!-- haku:verified';
 
 function verifiedMarker({ kind, status, sha }) {
@@ -168,6 +170,7 @@ module.exports = {
   issueFromBranch,
   prRefs,
   SUMMARY_MARKER,
+  ACCEPTED_CLOSE_MARKER,
   verifiedMarker,
   parseVerifiedMarker,
   slugify,
