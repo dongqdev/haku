@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "unit": {
+      "cmd": ["node", "--test", "tests/*.test.js"],
+      "countPattern": "tests (\\d+)",
+      "minTests": 1
+    }
+  }
+}

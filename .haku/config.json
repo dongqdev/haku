@@ -1,0 +1,6 @@
+{
+  "assignee": "dongqdev",
+  "maxWorkers": 2,
+  "mergeMode": "approve-each",
+  "titlePrefix": true
+}
