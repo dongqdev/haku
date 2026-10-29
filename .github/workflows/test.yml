@@ -25,6 +25,15 @@ jobs:
       - name: Run tests
         shell: bash
         run: node --test tests/*.test.js
+  paths:
+    # A personal path in a tracked file would leak a machine and a user name if the repository ever goes public.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-personal-paths.js
   version:
     # Installed plugin copies are keyed by version, so shipped changes must raise it.
     if: github.event_name == 'pull_request'
