@@ -86,8 +86,37 @@ function commitsBeyond(cwd, prHead, tip, what) {
   return r.out ? r.out.split('\n') : [];
 }
 
+// What a git operation in progress means for the worktree: a half-done rebase or merge holds work that
+// `status` can show as clean (an amended commit during `rebase -i`, for instance).
+const IN_PROGRESS = ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG'];
+
+function operationInProgress(worktree) {
+  for (const name of IN_PROGRESS) {
+    const r = gitTry(worktree, ['rev-parse', '--git-path', name]);
+    if (r.ok && fs.existsSync(path.resolve(worktree, r.out))) return name;
+  }
+  return null;
+}
+
+// "sha refname" lines of `git ls-remote` for exactly refs/heads/<branch>. ls-remote matches by name
+// suffix, so `a/task/7-x` would also answer a query for `task/7-x`; only the exact ref counts.
+function remoteBranchTip(cwd, branch) {
+  const r = gitTry(cwd, ['ls-remote', '--heads', 'origin', `refs/heads/${branch}`]);
+  if (!r.ok) return { ok: false, err: r.err };
+  const hit = r.out.split('\n').map(l => l.split(/\s+/)).find(([, ref]) => ref === `refs/heads/${branch}`);
+  return { ok: true, tip: hit ? hit[0] : null };
+}
+
+// Deletes the remote branch only if it still points at the commit that was just checked. Someone pushing in
+// between (the accident this gate exists for) makes the lease fail and the branch stays.
+function deleteRemoteBranch(cwd, branch, expectedTip) {
+  const r = gitTry(cwd, ['push', 'origin', `--force-with-lease=refs/heads/${branch}:${expectedTip}`, '--delete', branch]);
+  return { deleted: r.ok, error: r.ok ? null : r.err };
+}
+
 // gate is the result of done-gate.doneCheck. Nothing is deleted without a passing gate, and even with one
-// not while the worktree holds uncommitted files or the branch holds commits the merged pull request did
+// not while the worktree holds uncommitted files, a rebase or merge is half done, HEAD is not on the task
+// branch (or holds commits beyond the merged head), or the branch holds commits the merged pull request did
 // not contain. Every check runs before the first deletion, so a refusal leaves everything in place.
 // abandon skips the gate; discard is the explicit "throw the uncommitted files away".
 // With deleteRemote and a passing gate the remote task branch is deleted too (a branch the host already
@@ -100,15 +129,24 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
     throw new Error(`refusing to delete worker #${issue}; missing: ${missing}`);
   }
 
-  const status = fs.existsSync(record.path) ? gitTry(record.path, ['status', '--porcelain']) : { ok: true, out: '' };
+  const present = fs.existsSync(record.path);
+  const status = present ? gitTry(record.path, ['status', '--porcelain', '--ignored']) : { ok: true, out: '' };
   if (!status.ok) throw new Error(`refusing to delete worker #${issue}; could not read the worktree status: ${status.err}`);
-  const dirty = status.out ? status.out.split('\n') : [];
+  const lines = status.out ? status.out.split('\n') : [];
+  const dirty = lines.filter(l => !l.startsWith('!! '));
+  // Ignored files (for example a local .env) are deleted with the worktree; they are reported, not refused,
+  // because build output such as node_modules would otherwise block every cleanup.
+  const ignored = lines.filter(l => l.startsWith('!! ')).map(l => l.slice(3));
   if (dirty.length && !discard) {
     throw new Error(`refusing to delete worker #${issue}; ${dirty.length} uncommitted file(s) would be lost:\n${list(dirty, 20)}\n`
       + '    commit them, or pass --discard to throw them away');
   }
+  const ongoing = present ? operationInProgress(record.path) : null;
+  if (ongoing && !discard) {
+    throw new Error(`refusing to delete worker #${issue}; a ${ongoing} operation is in progress in the worktree and may hold work that is not committed yet`);
+  }
 
-  let discardedCommits = 0;
+  let discarded = { commits: 0, files: dirty.length };
   if (!abandon) {
     if (!gate.prHead) throw new Error(`refusing to delete worker #${issue}; the gate did not report the merged pull request's head commit`);
     const tip = git(cwd, ['rev-parse', record.branch]);
@@ -117,31 +155,51 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
       throw new Error(`refusing to delete worker #${issue}; ${extra.length} commit(s) on ${record.branch} came after the merged pull request and would be lost:\n${list(extra)}\n`
         + '    put them in a follow-up pull request first');
     }
-    if (deleteRemote && /^task\//.test(record.branch)) {
-      const remote = gitTry(cwd, ['ls-remote', '--heads', 'origin', record.branch]);
-      if (!remote.ok) throw new Error(`refusing to delete worker #${issue}; could not read the remote branch: ${remote.err}`);
-      const remoteTip = remote.out.split(/\s+/)[0];
-      if (remoteTip) {
-        const beyond = commitsBeyond(cwd, gate.prHead, remoteTip, 'remote branch');
-        if (beyond.length) {
-          throw new Error(`refusing to delete worker #${issue}; ${beyond.length} commit(s) on origin/${record.branch} came after the merged pull request:\n${list(beyond)}`);
+    // The worktree's own HEAD: on another branch or detached it can hold commits no branch points at.
+    if (present) {
+      const onBranch = gitTry(record.path, ['symbolic-ref', '-q', 'HEAD']);
+      if (!onBranch.ok || onBranch.out !== `refs/heads/${record.branch}`) {
+        const head = gitTry(record.path, ['rev-parse', 'HEAD']);
+        if (!head.ok) throw new Error(`refusing to delete worker #${issue}; could not read the worktree's HEAD: ${head.err}`);
+        const lost = commitsBeyond(cwd, gate.prHead, head.out, "worktree's HEAD");
+        if (lost.length) {
+          throw new Error(`refusing to delete worker #${issue}; the worktree's HEAD is not on ${record.branch} and holds ${lost.length} commit(s) that no branch contains:\n${list(lost)}`);
         }
       }
     }
   } else {
-    const count = gitTry(cwd, ['rev-list', '--count', `${record.base}..${record.branch}`]);
-    discardedCommits = count.ok ? Number(count.out) : 0;
+    // Commits reachable from the branch or from the worktree's HEAD that the base does not have. null means
+    // "could not be counted", which is reported as unknown rather than as zero.
+    const count = gitTry(present ? record.path : cwd, ['rev-list', '--count', record.branch, ...(present ? ['HEAD'] : []), `^${record.base}`]);
+    discarded.commits = count.ok ? Number(count.out) : null;
   }
 
-  git(cwd, ['worktree', 'remove', '--force', record.path]);
+  let remoteTip = null;
+  if (!abandon && deleteRemote && /^task\//.test(record.branch)) {
+    const remote = remoteBranchTip(cwd, record.branch);
+    if (!remote.ok) throw new Error(`refusing to delete worker #${issue}; could not read the remote branch: ${remote.err}`);
+    remoteTip = remote.tip;
+    if (remoteTip) {
+      const beyond = commitsBeyond(cwd, gate.prHead, remoteTip, 'remote branch');
+      if (beyond.length) {
+        throw new Error(`refusing to delete worker #${issue}; ${beyond.length} commit(s) on origin/${record.branch} came after the merged pull request:\n${list(beyond)}`);
+      }
+    }
+  }
+
+  if (present) git(cwd, ['worktree', 'remove', '--force', record.path]);
+  else git(cwd, ['worktree', 'prune']);
   // Squash/rebase merges leave the branch unmerged from git's point of view, hence -D.
   git(cwd, ['branch', '-D', record.branch]);
   fs.rmSync(path.join(recordDir(cwd), `worker-${issue}.json`), { force: true });
   let remoteBranchDeleted = false;
-  if (deleteRemote && !abandon && /^task\//.test(record.branch)) {
-    remoteBranchDeleted = spawnSync('git', ['push', 'origin', '--delete', record.branch], { cwd, encoding: 'utf8' }).status === 0;
+  let remoteBranchKept = null;
+  if (remoteTip) {
+    const r = deleteRemoteBranch(cwd, record.branch, remoteTip);
+    remoteBranchDeleted = r.deleted;
+    if (!r.deleted) remoteBranchKept = r.error;
   }
-  return { ...record, remoteBranchDeleted, discarded: { commits: discardedCommits, files: dirty.length } };
+  return { ...record, remoteBranchDeleted, remoteBranchKept, discarded, ignoredFilesDeleted: ignored.slice(0, 20) };
 }
 
-module.exports = { startWorker, removeWorker, listWorkers, workerRoot, DEFAULT_MAX_WORKERS };
+module.exports = { startWorker, removeWorker, listWorkers, workerRoot, deleteRemoteBranch, remoteBranchTip, DEFAULT_MAX_WORKERS };

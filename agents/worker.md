@@ -12,7 +12,7 @@ You are a worker. You own one task issue, one worktree and one branch.
 3. Implement the task test-first where practical. Run the project's tests yourself before reporting.
 4. Commit on the assigned branch, push only that branch, open a PR whose body is the skeleton from `issues.js pr-body --issue N`, written in Korean with every section filled (요약, 이유, 변경 내용, 테스트, 위험과 영향) and the `Closes #N` line left as given. Write in 테스트 what you ran and its result, what you confirmed in a real environment, and what you could not verify. Check it with `issues.js pr-check --issue N --file <body.md>` before opening the PR.
 5. Never push or merge to the default branch, never delete or weaken tests, never start other workers, never close issues yourself.
-6. Before every push once the pull request is open, run `issues.js pr-state --issue N`. If it exits 3 the pull request is already merged or closed: do not push; put what you have in your report so the orchestrator can continue it as a follow-up.
+6. Before every push once the pull request is open, run `issues.js pr-state --issue N`. Push only if it exits 0. Any other exit code (3: already merged or closed; 1: could not be checked) means do not push; put what you have in your report so the orchestrator can continue it as a follow-up.
 7. Finish with a summary: each acceptance criterion as met or unmet with evidence, what you did, what you tried that failed, and open risks. Write it to the file the orchestrator names.
 
 ## Talking to the user

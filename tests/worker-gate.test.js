@@ -164,10 +164,129 @@ test('the skills and the worker tell the model about the frozen pull request and
   assert.match(build, /Ask only when every review fix is pushed and the checks pass; never while a review is still running/);
   assert.match(build, /the pull request is frozen: no more commits go onto it/);
   assert.match(build, /run `issues\.js pr-state --issue N`/);
-  assert.match(build, /Exit 3 means it is already merged or closed: do not push/);
+  assert.match(build, /Push only on exit 0/);
+  assert.match(build, /Any other exit code \(for example 1: the state could not be checked\) also means do not push/);
+  assert.match(build, /a count of `null` means it could not be determined/);
+  assert.match(build, /`ignoredFilesDeleted`/);
+  assert.strictEqual((build.match(/^8\. /gm) || []).length, 1, 'step numbers must not repeat');
   assert.match(build, /holds commits that came after the merged pull request/);
   assert.match(build, /`--discard` throws uncommitted files away and is used only after asking the user with a choice question/);
   const worker = read('agents/worker.md');
   assert.match(worker, /run `issues\.js pr-state --issue N`/);
-  assert.match(worker, /If it exits 3 the pull request is already merged or closed: do not push/);
+  assert.match(worker, /Push only if it exits 0/);
+});
+
+// ---- holes found in review: HEAD off the branch, half-done operations, ref matching, races, ignored files
+const { deleteRemoteBranch, remoteBranchTip } = require('../scripts/lib/worker');
+
+test('a commit made on a detached HEAD in the worktree is refused (no branch would hold it)', () => {
+  const ctx = setup();
+  sh(ctx.w.path, 'checkout', '-q', '--detach');
+  fs.writeFileSync(path.join(ctx.w.path, 'only-here.txt'), 'x');
+  sh(ctx.w.path, 'add', '-A');
+  sh(ctx.w.path, 'commit', '-q', '-m', 'commit on a detached head');
+  assert.throws(
+    () => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }),
+    err => /HEAD is not on task\/7-work and holds 1 commit\(s\) that no branch contains/.test(err.message) && /commit on a detached head/.test(err.message)
+  );
+  assert.ok(fs.existsSync(ctx.w.path));
+});
+
+test('a detached HEAD that holds nothing new is fine to delete', () => {
+  const ctx = setup();
+  sh(ctx.w.path, 'checkout', '-q', '--detach');
+  removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } });
+  assert.ok(!fs.existsSync(ctx.w.path));
+});
+
+test('a rebase or merge in progress is refused even though status looks clean', () => {
+  const ctx = setup();
+  const marker = spawnSync('git', ['rev-parse', '--git-path', 'MERGE_HEAD'], { cwd: ctx.w.path, encoding: 'utf8' }).stdout.trim();
+  fs.writeFileSync(path.resolve(ctx.w.path, marker), `${ctx.prHead}\n`);
+  assert.throws(() => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }), /MERGE_HEAD operation is in progress/);
+  assert.ok(fs.existsSync(ctx.w.path));
+});
+
+test('a worktree whose status cannot be read is kept', () => {
+  const ctx = setup();
+  fs.writeFileSync(path.join(ctx.w.path, '.git'), 'gitdir: /nonexistent/place\n');
+  assert.throws(() => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }), /could not read the worktree status/);
+  assert.ok(fs.existsSync(ctx.w.path));
+});
+
+test('ls-remote suffix matches do not fool the check: only refs/heads/<branch> itself counts', () => {
+  const ctx = setup();
+  // the real remote branch gets a commit after the merge; a look-alike branch points at the merged head
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'haku-gate-other-'));
+  sh(other, 'clone', '-q', ctx.remote, '.');
+  sh(other, 'checkout', '-q', ctx.w.branch);
+  fs.writeFileSync(path.join(other, 'late.txt'), 'x');
+  sh(other, 'add', '-A');
+  sh(other, 'commit', '-q', '-m', 'late commit on the real branch');
+  sh(other, 'push', '-q', 'origin', ctx.w.branch);
+  sh(other, 'push', '-q', 'origin', `${ctx.prHead}:refs/heads/a/${ctx.w.branch}`);
+  sh(ctx.repo, 'fetch', '-q', 'origin');
+  const tip = remoteBranchTip(ctx.repo, ctx.w.branch);
+  assert.strictEqual(tip.tip, sh(other, 'rev-parse', 'HEAD'), 'the exact branch, not the look-alike');
+  assert.throws(
+    () => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead }, deleteRemote: true }),
+    /1 commit\(s\) on origin\/task\/7-work came after the merged pull request/
+  );
+  assert.ok(sh(ctx.repo, 'ls-remote', '--heads', 'origin', `refs/heads/${ctx.w.branch}`));
+});
+
+test('the remote branch is deleted only if it still points at the commit that was checked', () => {
+  const ctx = setup();
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), 'haku-gate-other-'));
+  sh(other, 'clone', '-q', ctx.remote, '.');
+  sh(other, 'checkout', '-q', ctx.w.branch);
+  fs.writeFileSync(path.join(other, 'raced.txt'), 'x');
+  sh(other, 'add', '-A');
+  sh(other, 'commit', '-q', '-m', 'pushed between the check and the delete');
+  sh(other, 'push', '-q', 'origin', ctx.w.branch);
+  const stale = deleteRemoteBranch(ctx.repo, ctx.w.branch, ctx.prHead);
+  assert.strictEqual(stale.deleted, false);
+  assert.ok(sh(ctx.repo, 'ls-remote', '--heads', 'origin', `refs/heads/${ctx.w.branch}`), 'the branch with the new commit must survive');
+  const fresh = deleteRemoteBranch(ctx.repo, ctx.w.branch, sh(other, 'rev-parse', 'HEAD'));
+  assert.strictEqual(fresh.deleted, true);
+});
+
+test('ignored files are deleted with the worktree but reported, not silently dropped', () => {
+  const ctx = setup();
+  fs.writeFileSync(path.join(ctx.repo, '.gitignore'), '.env\n');
+  sh(ctx.repo, 'add', '-A');
+  sh(ctx.repo, 'commit', '-q', '-m', 'ignore env');
+  const w2 = startWorker({ cwd: ctx.repo, issue: 8, title: 'Env', base: 'main', home: ctx.home });
+  fs.writeFileSync(path.join(w2.path, '.env'), 'SECRET=1');
+  sh(w2.path, 'push', '-q', 'origin', w2.branch);
+  const r = removeWorker({ cwd: ctx.repo, issue: 8, gate: { ok: true, prHead: sh(ctx.repo, 'rev-parse', w2.branch) } });
+  assert.deepStrictEqual(r.ignoredFilesDeleted, ['.env']);
+  assert.deepStrictEqual(r.discarded, { commits: 0, files: 0 });
+});
+
+test('an abandon whose commits cannot be counted reports unknown (null), never zero', () => {
+  const ctx = setup();
+  const common = path.resolve(ctx.repo, spawnSync('git', ['rev-parse', '--git-common-dir'], { cwd: ctx.repo, encoding: 'utf8' }).stdout.trim());
+  const recFile = path.join(common, 'haku', 'worker-7.json');
+  const rec = JSON.parse(fs.readFileSync(recFile, 'utf8'));
+  rec.base = 'no-such-base';
+  fs.writeFileSync(recFile, JSON.stringify(rec));
+  const r = removeWorker({ cwd: ctx.repo, issue: 7, gate: null, abandon: true });
+  assert.strictEqual(r.discarded.commits, null);
+});
+
+test('abandon counts commits on a detached HEAD too', () => {
+  const ctx = setup();
+  sh(ctx.w.path, 'checkout', '-q', '--detach');
+  fs.writeFileSync(path.join(ctx.w.path, 'd.txt'), 'x');
+  sh(ctx.w.path, 'add', '-A');
+  sh(ctx.w.path, 'commit', '-q', '-m', 'detached work');
+  const r = removeWorker({ cwd: ctx.repo, issue: 7, gate: null, abandon: true });
+  assert.strictEqual(r.discarded.commits, 2, 'the branch commit and the detached commit');
+});
+
+test('pr-state: the newest pull request of a reused branch name decides', () => {
+  assert.strictEqual(prState(hostWith([{ number: 5, state: 'merged', headRefOid: 'a' }, { number: 8, state: 'open', headRefOid: 'b' }]), 'b').safeToPush, true);
+  assert.strictEqual(prState(hostWith([{ number: 3, state: 'open', headRefOid: 'a' }, { number: 9, state: 'merged', headRefOid: 'b' }]), 'b').safeToPush, false);
+  assert.strictEqual(prState(hostWith([{ number: 3, state: 'merged', headRefOid: 'a' }, { number: 9, state: 'closed', headRefOid: 'b' }]), 'b').state, 'closed');
 });

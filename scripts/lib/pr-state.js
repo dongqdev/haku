@@ -5,11 +5,8 @@
 // work continues as a follow-up from the default branch instead.
 function prState(host, branch, localTip = null) {
   const prs = host.prsForBranch(branch);
-  const pick = state => prs.filter(p => p.state === state).sort((a, b) => b.number - a.number)[0];
-  const merged = pick('merged');
-  const open = pick('open');
-  const closed = pick('closed');
-  const chosen = merged || open || closed || null;
+  // A branch name can be reused: the newest pull request is the one the branch feeds now.
+  const chosen = prs.length ? [...prs].sort((x, y) => y.number - x.number)[0] : null;
   const state = chosen ? chosen.state : 'none';
   return {
     branch,
