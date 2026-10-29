@@ -3,7 +3,8 @@
 // Claude Code installs a plugin into a cache keyed by its version, so a merged change that keeps the
 // version never reaches an installed copy. The marketplace source is the whole repository, so anything
 // that is not clearly documentation, tests or CI counts as shipped and must come with a higher version.
-const EXEMPT = /^(?:(?:README\.md|LICENSE|\.gitignore)$|(?:tests|\.github)\/)/;
+// README.md and its translations (README.en.md, README.ko-KR.md, ...) are documentation.
+const EXEMPT = /^(?:(?:README(?:\.[A-Za-z]{2,3}(?:-[A-Za-z]{2,4})?)?\.md|LICENSE|\.gitignore)$|(?:tests|\.github)\/)/;
 
 const needsBump = files => files.some(f => !EXEMPT.test(f.replace(/\\/g, '/')));
 

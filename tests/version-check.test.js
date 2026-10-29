@@ -22,6 +22,13 @@ test('everything except docs, tests and CI requires a version bump', () => {
   assert.strictEqual(needsBump(['README.md', 'LICENSE', 'tests/a.test.js', '.github/workflows/test.yml']), false);
 });
 
+test('translated READMEs are documentation, look-alikes are not', () => {
+  assert.strictEqual(needsBump(['README.en.md', 'README.ko-KR.md', 'README.zh-Hans.md']), false);
+  for (const f of ['README.en.md.js', 'README.en.sh', 'README.english.md', 'docs/README.en.md', 'READMEen.md', 'README..md']) {
+    assert.strictEqual(needsBump([f]), true, f);
+  }
+});
+
 test('a shipped change with an unchanged version is a problem, a raised version is not', () => {
   const changedFiles = ['skills/plan/SKILL.md'];
   assert.match(bumpProblems({ changedFiles, baseVersion: '0.2.0', version: '0.2.0' })[0], /still 0\.2\.0/);
