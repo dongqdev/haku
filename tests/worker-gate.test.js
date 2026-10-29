@@ -187,7 +187,7 @@ test('a commit made on a detached HEAD in the worktree is refused (no branch wou
   sh(ctx.w.path, 'commit', '-q', '-m', 'commit on a detached head');
   assert.throws(
     () => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }),
-    err => /HEAD is not on task\/7-work and holds 1 commit\(s\) that no branch contains/.test(err.message) && /commit on a detached head/.test(err.message)
+    err => /HEAD is detached and holds 1 commit\(s\) that no branch contains/.test(err.message) && /commit on a detached head/.test(err.message)
   );
   assert.ok(fs.existsSync(ctx.w.path));
 });
@@ -289,4 +289,26 @@ test('pr-state: the newest pull request of a reused branch name decides', () => 
   assert.strictEqual(prState(hostWith([{ number: 5, state: 'merged', headRefOid: 'a' }, { number: 8, state: 'open', headRefOid: 'b' }]), 'b').safeToPush, true);
   assert.strictEqual(prState(hostWith([{ number: 3, state: 'open', headRefOid: 'a' }, { number: 9, state: 'merged', headRefOid: 'b' }]), 'b').safeToPush, false);
   assert.strictEqual(prState(hostWith([{ number: 3, state: 'merged', headRefOid: 'a' }, { number: 9, state: 'closed', headRefOid: 'b' }]), 'b').state, 'closed');
+});
+
+test('commits made on another branch inside the worktree are not lost by the removal, so it proceeds', () => {
+  const ctx = setup();
+  sh(ctx.w.path, 'checkout', '-q', '-b', 'side-work');
+  fs.writeFileSync(path.join(ctx.w.path, 'side.txt'), 'x');
+  sh(ctx.w.path, 'add', '-A');
+  sh(ctx.w.path, 'commit', '-q', '-m', 'work kept on its own branch');
+  removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } });
+  assert.ok(!fs.existsSync(ctx.w.path));
+  assert.match(sh(ctx.repo, 'log', '--format=%s', '-1', 'side-work'), /work kept on its own branch/);
+});
+
+test('every kind of operation in progress is refused', () => {
+  for (const name of ['rebase-merge', 'rebase-apply', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'BISECT_LOG']) {
+    const ctx = setup();
+    const marker = path.resolve(ctx.w.path, spawnSync('git', ['rev-parse', '--git-path', name], { cwd: ctx.w.path, encoding: 'utf8' }).stdout.trim());
+    if (name.startsWith('rebase')) fs.mkdirSync(marker, { recursive: true });
+    else fs.writeFileSync(marker, `${ctx.prHead}\n`);
+    assert.throws(() => removeWorker({ cwd: ctx.repo, issue: 7, gate: { ok: true, prHead: ctx.prHead } }), new RegExp(`${name} operation is in progress`), name);
+    assert.ok(fs.existsSync(ctx.w.path), name);
+  }
 });

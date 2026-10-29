@@ -155,15 +155,16 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
       throw new Error(`refusing to delete worker #${issue}; ${extra.length} commit(s) on ${record.branch} came after the merged pull request and would be lost:\n${list(extra)}\n`
         + '    put them in a follow-up pull request first');
     }
-    // The worktree's own HEAD: on another branch or detached it can hold commits no branch points at.
+    // The worktree's own HEAD. Checked out on another branch, its commits live on that branch, which
+    // the removal does not touch. Detached, they belong to no branch and would be lost.
     if (present) {
       const onBranch = gitTry(record.path, ['symbolic-ref', '-q', 'HEAD']);
-      if (!onBranch.ok || onBranch.out !== `refs/heads/${record.branch}`) {
+      if (!onBranch.ok) {
         const head = gitTry(record.path, ['rev-parse', 'HEAD']);
         if (!head.ok) throw new Error(`refusing to delete worker #${issue}; could not read the worktree's HEAD: ${head.err}`);
         const lost = commitsBeyond(cwd, gate.prHead, head.out, "worktree's HEAD");
         if (lost.length) {
-          throw new Error(`refusing to delete worker #${issue}; the worktree's HEAD is not on ${record.branch} and holds ${lost.length} commit(s) that no branch contains:\n${list(lost)}`);
+          throw new Error(`refusing to delete worker #${issue}; the worktree's HEAD is detached and holds ${lost.length} commit(s) that no branch contains:\n${list(lost)}`);
         }
       }
     }
