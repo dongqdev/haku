@@ -52,3 +52,40 @@ test('a closing line inside a code fence does not count', () => {
   const body = filled(3).replace('Closes #3', '```\nCloses #3\n```');
   assert.match(checkBody(body, 3).problems.join('\n'), /Closes #3.*없습니다/);
 });
+
+const withClosing = (extra) => `${filled(3).replace('Closes #3', 'Closes #3')}${extra}\n`;
+
+test('qualified and URL closing references are rejected even for the same repository', () => {
+  assert.match(checkBody(withClosing('Closes dongqdev/ecc-harness#9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
+  assert.match(checkBody(withClosing('Closes https://github.com/dongqdev/ecc-harness/issues/9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
+});
+
+test('every section needs Korean prose, not just one of them', () => {
+  const body = filled(3, { '이유': 'TBD..', '변경 내용': 'TODO.', '테스트': 'N/A..', '위험과 영향': '?????' });
+  const text = checkBody(body, 3).problems.join('\n');
+  for (const n of ['이유', '변경 내용', '테스트', '위험과 영향']) assert.match(text, new RegExp(`"## ${n}" 항목은 한글`));
+});
+
+test('Korean inside a code block or a quote does not satisfy the Korean check', () => {
+  const english = 'Renames the skills and updates every reference in the docs.';
+  const body = filled(3, { '테스트': `${english}\n\`\`\`\n한글로 쓴 스무 글자가 넘는 문장이 코드 블록 안에만 있습니다\n\`\`\`` });
+  assert.match(checkBody(body, 3).problems.join('\n'), /"## 테스트" 항목은 한글/);
+  const quoted = filled(3, { '테스트': `${english}\n> 한글로 쓴 스무 글자가 넘는 문장이 인용문 안에만 있습니다` });
+  assert.match(checkBody(quoted, 3).problems.join('\n'), /"## 테스트" 항목은 한글/);
+});
+
+test('a closing line in ~~~ fences, indented code or inline code does not count', () => {
+  for (const wrapped of ['~~~\nCloses #3\n~~~', '    Closes #3', '`Closes #3`']) {
+    const body = filled(3).replace('Closes #3', wrapped);
+    assert.match(checkBody(body, 3).problems.join('\n'), /Closes #3.*없습니다/, wrapped);
+  }
+});
+
+test('a heading inside a code fence is not a section', () => {
+  const fenced = '```\n' + filled(3).replace(/## 닫히는 이슈[\s\S]*$/, '') + '```\n\n## 닫히는 이슈\nCloses #3\n';
+  assert.match(checkBody(fenced, 3).problems.join('\n'), /항목이 없습니다/);
+});
+
+test('CRLF line endings are accepted', () => {
+  assert.deepStrictEqual(checkBody(filled(3).replace(/\n/g, '\r\n'), 3), { ok: true, problems: [] });
+});

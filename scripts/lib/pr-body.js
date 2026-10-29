@@ -3,6 +3,7 @@
 const { closingRefsFromText } = require('./model');
 
 // Every PR body answers the same questions, in Korean, so the merge-approval screen can be read at a glance.
+const MIN_HANGUL = 5;
 const SECTIONS = ['요약', '이유', '변경 내용', '테스트', '위험과 영향'];
 
 const GUIDE = {
@@ -23,8 +24,37 @@ function withoutComments(text) {
   return String(text || '').replace(/<!--[\s\S]*?-->/g, '');
 }
 
+// Lines inside a fenced code block (``` or ~~~) get a zero-width mark so a "## ..." line in an
+// example is not read as a section heading. The text itself stays, so it still counts as content.
+function maskFences(text) {
+  let fence = null;
+  return text.split(/\r?\n/).map(line => {
+    const m = line.match(/^\s*(```+|~~~+)/);
+    if (m) {
+      const mark = m[1][0];
+      if (fence === null) fence = mark;
+      else if (fence === mark) fence = null;
+      return `\u200b${line}`;
+    }
+    return fence === null ? line : `\u200b${line}`;
+  }).join('\n');
+}
+
+// What a reader would take as the author's own words: no code (fenced, indented, inline) and no quotes.
+function proseOf(text) {
+  return String(text || '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '')
+    .replace(/^(?: {4}|\t).*$/gm, '')
+    .replace(/`[^`\n]*`/g, '')
+    .replace(/^\s*>.*$/gm, '');
+}
+
+// GitHub also closes issues through "owner/repo#N" and issue URLs, which the bare "#N" parser ignores.
+const QUALIFIED_CLOSE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:[\w.-]+\/[\w.-]+#\d+|https?:\/\/\S+\/issues\/\d+)/gi;
+
 function sectionBody(text, name) {
-  const lines = text.split(/\r?\n/);
+  const lines = maskFences(text).split(/\r?\n/);
   const start = lines.findIndex(l => new RegExp(`^##\\s+${name}\\s*$`).test(l));
   if (start === -1) return null;
   const rest = lines.slice(start + 1);
@@ -32,24 +62,27 @@ function sectionBody(text, name) {
   return (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
 }
 
-// ok only when every section exists and has content, the text is Korean, and the body
-// closes exactly the task it belongs to.
+// ok only when every section exists, has content and Korean prose, and the body closes exactly
+// the task it belongs to (no other issue, no qualified reference form).
 function checkBody(body, issue) {
   const text = withoutComments(body);
   const problems = [];
-  const contents = [];
 
   for (const name of SECTIONS) {
     const content = sectionBody(text, name);
     if (content === null) problems.push(`"## ${name}" 항목이 없습니다`);
     else if (content.replace(/\s/g, '').length < 5) problems.push(`"## ${name}" 항목이 비어 있습니다`);
-    else contents.push(content);
+    // Headings are Korean by construction, so Korean is required in each section's own prose.
+    else if ((proseOf(content).match(/[가-힣]/g) || []).length < MIN_HANGUL) {
+      problems.push(`"## ${name}" 항목은 한글로 ${MIN_HANGUL}자 이상 써야 합니다 (코드와 인용문은 세지 않습니다)`);
+    }
   }
 
-  // Headings are Korean by construction, so only the written content counts as "written in Korean".
-  if ((contents.join('\n').match(/[가-힣]/g) || []).length < 20) problems.push('본문이 한글로 작성되지 않았습니다 (항목 내용의 한글이 20자 미만)');
+  const claims = proseOf(text);
+  const qualified = [...claims.matchAll(QUALIFIED_CLOSE)].map(m => m[0].trim());
+  if (qualified.length) problems.push(`저장소 이름이나 URL을 붙인 닫는 참조는 쓸 수 없습니다: ${qualified.join(', ')}`);
 
-  const refs = [...closingRefsFromText(text)];
+  const refs = [...closingRefsFromText(claims)];
   if (!refs.includes(issue)) problems.push(`닫는 줄 "Closes #${issue}"이 없습니다`);
   const others = refs.filter(n => n !== issue);
   if (others.length) problems.push(`이 작업 외의 이슈를 닫으려 합니다: ${others.map(n => `#${n}`).join(', ')}`);
