@@ -71,12 +71,17 @@ function main(argv) {
       if (!arg1) throw new Error('publish needs a draft file');
       const mapFile = `${arg1}.map.json`;
       const state = fs.existsSync(mapFile) ? JSON.parse(fs.readFileSync(mapFile, 'utf8')) : { numbers: {} };
-      const result = publish(opts.apply ? host() : null, JSON.parse(fs.readFileSync(arg1, 'utf8')), {
-        apply: Boolean(opts.apply),
-        state,
-        orchestrator: opts.orchestrator || null
-      });
-      if (opts.apply && result.ok) fs.writeFileSync(mapFile, JSON.stringify(state, null, 2));
+      let result;
+      try {
+        result = publish(opts.apply ? host() : null, JSON.parse(fs.readFileSync(arg1, 'utf8')), {
+          apply: Boolean(opts.apply),
+          state,
+          orchestrator: opts.orchestrator || null
+        });
+      } finally {
+        // Save progress even when publish throws midway, so a retry resumes instead of duplicating.
+        if (opts.apply && Object.keys(state.numbers).length) fs.writeFileSync(mapFile, JSON.stringify(state, null, 2));
+      }
       out(result);
       return result.ok ? 0 : 1;
     }

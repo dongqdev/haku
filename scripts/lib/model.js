@@ -7,7 +7,9 @@ const TYPES = ['story', 'milestone', 'task'];
 const BASE_LABEL = 'ecc-harness';
 
 const typeLabel = type => `type:${type}`;
-const railLabel = rail => `rail:${rail}`;
+// Who owns an issue is the host's assignee. The owner label is only the fallback for people
+// who cannot be assigned (for example, not a collaborator on the repository).
+const ownerLabel = name => `owner:${name}`;
 
 function labelNames(issue) {
   return (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
@@ -18,9 +20,11 @@ function issueType(issue) {
   return TYPES.find(t => names.includes(typeLabel(t))) || null;
 }
 
-function issueRail(issue) {
-  const hit = labelNames(issue).find(n => n.startsWith('rail:'));
-  return hit ? hit.slice('rail:'.length) : null;
+function issueOwner(issue) {
+  const assignee = (issue.assignees || [])[0];
+  if (assignee) return typeof assignee === 'string' ? assignee : assignee.login;
+  const hit = labelNames(issue).find(n => n.startsWith('owner:'));
+  return hit ? hit.slice('owner:'.length) : null;
 }
 
 // Remove fenced code blocks and quoted lines so examples/quotes never count as claims.
@@ -82,10 +86,10 @@ module.exports = {
   TYPES,
   BASE_LABEL,
   typeLabel,
-  railLabel,
+  ownerLabel,
   labelNames,
   issueType,
-  issueRail,
+  issueOwner,
   parentOf,
   closingRefsFromText,
   issueFromBranch,

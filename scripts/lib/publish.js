@@ -1,18 +1,18 @@
 'use strict';
 
-const { BASE_LABEL, typeLabel, railLabel } = require('./model');
+const { BASE_LABEL, typeLabel } = require('./model');
 
 const KINDS = ['T1', 'T2', 'T3'];
 
 // A draft is the locally written, user-approved plan:
-// { rail, sprint?, story:{id,title,body?,verify}, milestones:[{id,title,body?,verify,
+// { assignee, sprint?, story:{id,title,body?,verify}, milestones:[{id,title,body?,verify,
 //   tasks:[{id,title,body?,acceptance:[..],verify,scope:[..],dependsOn?:[ids]}]}] }
 function validateDraft(draft) {
   const errors = [];
   const ids = new Set();
   const need = (cond, msg) => { if (!cond) errors.push(msg); };
 
-  need(draft && typeof draft.rail === 'string' && draft.rail.trim(), 'rail is required (who owns this story)');
+  need(draft && typeof draft.assignee === 'string' && draft.assignee.trim(), 'assignee is required (the host login that owns this story)');
   need(draft && draft.story && draft.story.title, 'story.title is required');
   need(draft && Array.isArray(draft.milestones) && draft.milestones.length > 0, 'at least one milestone is required');
   if (errors.length) return errors;
@@ -126,7 +126,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   if (!apply) return { ok: true, dryRun: true, plan, errors: [] };
 
   const labelsFor = e => {
-    const l = [BASE_LABEL, typeLabel(e.type), railLabel(draft.rail)];
+    const l = [BASE_LABEL, typeLabel(e.type)];
     if (draft.sprint) l.push(`sprint:${draft.sprint}`);
     return l;
   };
@@ -137,7 +137,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     // Parent line needs the parent's number, which exists because parents come first.
     let body = renderBody(e, numbers);
     if (e.type === 'story' && orchestrator) body += `\nOrchestrator: ${orchestrator}`;
-    const number = host.createIssue({ title: e.node.title, body, labels: labelsFor(e) });
+    const number = host.createIssue({ title: e.node.title, body, labels: labelsFor(e), assignee: draft.assignee });
     numbers.set(e.key, number);
     state.numbers[e.key] = number;
   }

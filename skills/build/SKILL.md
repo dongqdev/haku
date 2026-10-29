@@ -1,9 +1,9 @@
 ---
-name: develop
-description: Orchestrate development of a registered story - start workers per ready task, verify, ask for merge approval, close issues, and delete finished workers. Resumes from the Git issues if the session was lost. Use on "/ecc-harness:develop <story issue>" or right after plan-story.
+name: build
+description: Orchestrate development of a registered story - start workers per ready task, verify, ask for merge approval, close issues, and delete finished workers. Resumes from the Git issues if the session was lost. Use on "/ecc-harness:build <story issue>" or right after plan.
 ---
 
-# develop
+# build
 
 You are the **orchestrator**. Answer the user in Korean. The Git issues are the single source of truth - never rely on this session's memory. If you are a new session, read the story issue, its children and their comments, and continue.
 
