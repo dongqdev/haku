@@ -3,13 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { validateDraft, publish, flatten } = require('../scripts/lib/publish');
-const { issueType, issueRail, parentOf } = require('../scripts/lib/model');
+const { issueType, issueOwner, parentOf } = require('../scripts/lib/model');
 
 const verifyT1 = { kind: 'T1', profile: 'unit' };
 
 function draft(overrides = {}) {
   return {
-    rail: 'dongq',
+    assignee: 'dongq',
     sprint: '2026-S10',
     story: { id: 'S', title: 'Login', verify: verifyT1 },
     milestones: [{
@@ -32,8 +32,8 @@ function fakeHost() {
     issues,
     labels,
     ensureLabels: n => labels.push(...n),
-    createIssue: ({ title, body, labels: l }) => {
-      issues.push({ number: issues.length + 1, title, body, labels: l.map(name => ({ name })), state: 'open' });
+    createIssue: ({ title, body, labels: l, assignee }) => {
+      issues.push({ number: issues.length + 1, title, body, labels: l.map(name => ({ name })), assignees: assignee ? [{ login: assignee }] : [], state: 'open' });
       return issues.length;
     },
     updateIssueBody: (n, body) => { issues[n - 1].body = body; }
@@ -44,13 +44,13 @@ test('valid draft passes validation', () => {
   assert.deepStrictEqual(validateDraft(draft()), []);
 });
 
-test('rail, acceptance, scope and verify profile are mandatory', () => {
-  const d = draft({ rail: '' });
+test('assignee, acceptance, scope and verify profile are mandatory', () => {
+  const d = draft({ assignee: '' });
   d.milestones[0].tasks[0].acceptance = [];
   d.milestones[0].tasks[0].scope = [];
   d.milestones[0].tasks[1].verify = { kind: 'T1' };
   const errors = validateDraft(d).join('\n');
-  assert.match(errors, /rail is required/);
+  assert.match(errors, /assignee is required/);
 });
 
 test('missing acceptance/scope/profile are each reported', () => {
@@ -89,14 +89,14 @@ test('dry-run creates nothing', () => {
   assert.strictEqual(result.plan.length, 4);
 });
 
-test('apply creates parents first, links children, labels with rail/sprint', () => {
+test('apply creates parents first, links children, labels with sprint and assignee', () => {
   const host = fakeHost();
   const result = publish(host, draft(), { apply: true, orchestrator: 'session-abc' });
   assert.strictEqual(result.ok, true);
   const [story, milestone, t1, t2] = host.issues;
   assert.strictEqual(issueType(story), 'story');
   assert.strictEqual(issueType(milestone), 'milestone');
-  assert.strictEqual(issueRail(t1), 'dongq');
+  assert.strictEqual(issueOwner(t1), 'dongq');
   assert.strictEqual(parentOf(milestone), story.number);
   assert.strictEqual(parentOf(t1), milestone.number);
   assert.match(t2.body, /Depends-On: #3/);
@@ -120,7 +120,13 @@ test('resuming with saved state creates no duplicates', () => {
 
 test('invalid draft is never published', () => {
   const host = fakeHost();
-  const result = publish(host, draft({ rail: '' }), { apply: true });
+  const result = publish(host, draft({ assignee: '' }), { apply: true });
   assert.strictEqual(result.ok, false);
   assert.strictEqual(host.issues.length, 0);
+});
+
+test('issueOwner prefers the assignee and falls back to the owner label', () => {
+  assert.strictEqual(issueOwner({ assignees: [{ login: 'a' }], labels: [{ name: 'owner:b' }] }), 'a');
+  assert.strictEqual(issueOwner({ assignees: [], labels: [{ name: 'owner:b' }] }), 'b');
+  assert.strictEqual(issueOwner({ labels: [] }), null);
 });

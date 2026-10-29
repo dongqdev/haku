@@ -4,7 +4,7 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { BASE_LABEL } = require('./model');
+const { BASE_LABEL, ownerLabel } = require('./model');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
@@ -40,7 +40,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh' } = {}) {
     listIssues() {
       const out = gh([
         'issue', 'list', ...scope, '--state', 'all', '--label', BASE_LABEL,
-        '--limit', '1000', '--json', 'number,title,body,state,labels'
+        '--limit', '1000', '--json', 'number,title,body,state,labels,assignees'
       ]);
       return JSON.parse(out).map(i => ({ ...i, state: String(i.state).toLowerCase() }));
     },
@@ -65,13 +65,28 @@ function createGitHubHost({ repo = null, ghBin = 'gh' } = {}) {
       }
     },
 
-    createIssue({ title, body, labels }) {
+    // The assignee owns the issue. GitHub silently drops an assignee it cannot assign (for example
+    // someone who is not a collaborator) instead of failing, so the result is checked after creation
+    // and an owner:<name> label is added when the assignment did not stick.
+    createIssue({ title, body, labels, assignee }) {
       const out = withBodyFile(body, file => gh([
-        'issue', 'create', ...scope, '--title', title, '--body-file', file, '--label', labels.join(',')
+        'issue', 'create', ...scope, '--title', title, '--body-file', file,
+        '--label', labels.join(','),
+        ...(assignee ? ['--assignee', assignee] : [])
       ]));
       const m = out.trim().match(/\/issues\/(\d+)\s*$/);
       if (!m) throw new Error(`could not read the new issue number from: ${out.trim()}`);
-      return Number(m[1]);
+      const number = Number(m[1]);
+      if (assignee) {
+        const assigned = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'assignees']))
+          .assignees.map(a => String(a.login).toLowerCase());
+        if (!assigned.includes(String(assignee).toLowerCase())) {
+          const label = ownerLabel(assignee);
+          gh(['label', 'create', label, ...scope, '--force', '--color', 'ededed']);
+          gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
+        }
+      }
+      return number;
     },
 
     updateIssueBody(number, body) {

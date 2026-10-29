@@ -1,6 +1,6 @@
 ---
 name: worker
-description: Implements exactly one task issue in an assigned git worktree and reports a PR plus a summary. Started only by the develop orchestrator; cannot plan stories or start other workers.
+description: Implements exactly one task issue in an assigned git worktree and reports a PR plus a summary. Started only by the build orchestrator; cannot plan stories or start other workers.
 tools: ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]
 model: sonnet
 ---
