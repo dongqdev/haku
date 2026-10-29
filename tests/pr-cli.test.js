@@ -51,3 +51,17 @@ test('accept-close refuses to run without --user-approved', () => {
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /--user-approved/);
 });
+
+test('pr-config-changes needs a plain positive --pr', () => {
+  for (const args of [[], ['--pr', 'abc'], ['--pr', '0']]) {
+    const r = run('pr-config-changes', ...args);
+    assert.strictEqual(r.status, 1, args.join(' '));
+    assert.match(r.stderr, /--pr/);
+  }
+});
+
+test('pr-config-changes refuses an --issue that is not a number', () => {
+  const r = run('pr-config-changes', '--pr', '3', '--issue', 'abc');
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /--issue/);
+});

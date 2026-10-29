@@ -112,6 +112,14 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
       return { number: pr.number, state: String(pr.state).toLowerCase(), repo: repoSlug(), issues: refs.map(r => ({ number: r.number, repo: repoOf(r) })) };
     },
 
+    // Every file a pull request changes, read through all pages. GitHub lists at most 3000; a list that reaches it
+    // may be cut off, which is an error, not an answer.
+    prFiles(number) {
+      const files = restList(`pulls/${number}/files`, '', `files of #${number}`, f => f.filename);
+      if (files.length >= 3000) throw new Error(`pull request #${number} changes ${files.length} files, which reaches GitHub's limit of 3000; refusing to decide on a partial list`);
+      return files.map(f => ({ filename: f.filename, previous_filename: f.previous_filename || null, status: f.status, patch: typeof f.patch === 'string' ? f.patch : null }));
+    },
+
     // Every pull request ever opened from this branch, in any state: the branch name alone is not
     // proof, so callers compare the head commit (headRefOid) with the commit they hold.
     prsForBranch(branch) {

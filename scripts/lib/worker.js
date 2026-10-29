@@ -5,6 +5,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { slugify, stripPrefix, issueType, labelNames, BASE_LABEL } = require('./model');
+const { scopeOf } = require('./weaken');
 
 const DEFAULT_MAX_WORKERS = 2;
 
@@ -51,6 +52,7 @@ function assertTaskIssue(host, issue) {
   if (!labelNames(found).includes(BASE_LABEL)) throw new Error(`issue #${issue} is not a haku issue (no "${BASE_LABEL}" label)`);
   if (issueType(found) !== 'task') throw new Error(`issue #${issue} is not a task (type: ${issueType(found) || 'none'})`);
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
+  return found;
 }
 
 // Adds facts to a worker's record (for example the session it runs in).
@@ -62,7 +64,7 @@ function updateRecord(cwd, issue, patch) {
 }
 
 function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT_MAX_WORKERS }) {
-  if (host) assertTaskIssue(host, issue);
+  const found = host ? assertTaskIssue(host, issue) : null;
   const existing = listWorkers(cwd);
   if (existing.some(w => w.issue === issue)) throw new Error(`worker for #${issue} already exists`);
   if (existing.length >= maxWorkers) {
@@ -74,7 +76,10 @@ function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT
   fs.mkdirSync(path.dirname(dir), { recursive: true });
   git(cwd, ['worktree', 'add', '-b', branch, dir, base]);
 
-  const record = { issue, branch, path: dir, base, startedAt: new Date().toISOString() };
+  // The Scope as the task declared it when work began: the worker can edit the issue later, so the merge check
+  // compares against this copy.
+  const scope = found ? scopeOf(found.body) : null;
+  const record = { issue, branch, path: dir, base, startedAt: new Date().toISOString(), ...(scope ? { scope } : {}) };
   const rdir = recordDir(cwd);
   fs.mkdirSync(rdir, { recursive: true });
   fs.writeFileSync(path.join(rdir, `worker-${issue}.json`), JSON.stringify(record, null, 2));
