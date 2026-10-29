@@ -1,6 +1,6 @@
 {
   "name": "ecc-harness",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Personal cross-platform harness on ECC: Git-issue driven story planning, orchestrator/worker development, and merge-to-close reconciliation (GitHub first, GitLab next).",
   "license": "MIT",
   "keywords": ["harness", "orchestrator", "worker", "issues", "github", "gitlab"],
