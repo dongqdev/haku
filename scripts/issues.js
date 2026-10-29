@@ -12,7 +12,7 @@ const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitions } = require('./lib/model');
-const { planLabelChange } = require('./lib/labels');
+const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
@@ -325,11 +325,11 @@ function main(argv) {
       return 0;
     }
     case 'labels': {
-      const defs = baseLabelDefinitions();
-      if (opts.apply) host().ensureLabels(defs.map(d => d.name));
+      const defs = opts.apply ? ensureBaseLabels(host()) : baseLabelDefinitions();
       if (opts.json) out(defs);
       else for (const d of defs) console.log(`${d.name}\t${d.color}\t${d.description}`);
-      if (opts.apply) console.log(`${defs.length} labels ensured`);
+      // a summary line must not break the JSON on stdout
+      if (opts.apply) (opts.json ? console.error : console.log)(`${defs.length} labels ensured`);
       return 0;
     }
     case 'label': {

@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { baseLabelDefinitions, WORK_KINDS, STATE_LABELS } = require('../scripts/lib/model');
-const { planLabelChange } = require('../scripts/lib/labels');
+const { planLabelChange, ensureBaseLabels } = require('../scripts/lib/labels');
 const { publish, validateDraft } = require('../scripts/lib/publish');
 const { createGitHubHost } = require('../scripts/lib/github-host');
 
@@ -31,10 +31,23 @@ test('the base labels cover haku, type, kind and state, each with its own colour
   }
 });
 
-test('labels --json prints the same definitions the code uses', () => {
+test('labels --json prints parseable JSON of the definitions', () => {
   const r = spawnSync(process.execPath, [path.join(root, 'scripts', 'issues.js'), 'labels', '--json'], { encoding: 'utf8' });
   assert.strictEqual(r.status, 0, r.stderr);
   assert.deepStrictEqual(JSON.parse(r.stdout), baseLabelDefinitions());
+});
+
+test('setup creates exactly the labels the code defines, with their colours and descriptions', () => {
+  const created = [];
+  const exec = (bin, args) => {
+    if (args[0] === 'label' && args[1] === 'create') {
+      created.push({ name: args[2], color: args[args.indexOf('--color') + 1], description: args[args.indexOf('--description') + 1] });
+    }
+    return '';
+  };
+  ensureBaseLabels(createGitHubHost({ repo: 'o/r', exec }));
+  assert.deepStrictEqual(created, baseLabelDefinitions());
+  assert.match(read('skills', 'setup', 'SKILL.md'), /Labels are created with `issues\.js labels --apply`/);
 });
 
 test('label change: only state and kind labels may be touched', () => {
@@ -44,6 +57,19 @@ test('label change: only state and kind labels may be touched', () => {
   }
   assert.throws(() => planLabelChange(issue(), {}), /--add or --remove/);
   assert.throws(() => planLabelChange(issue(), { add: 'blocked', remove: 'blocked' }), /both added and removed/);
+});
+
+test('label change: names match without regard to letter case and repeats count once', () => {
+  assert.deepStrictEqual(planLabelChange(issue('Blocked'), { remove: 'blocked' }), { add: [], remove: ['Blocked'] });
+  assert.deepStrictEqual(planLabelChange(issue('Kind:Dev'), { add: 'kind:bug' }), { add: ['kind:bug'], remove: ['Kind:Dev'] });
+  assert.deepStrictEqual(planLabelChange(issue(), { add: 'Blocked,blocked' }), { add: ['blocked'], remove: [] });
+  assert.deepStrictEqual(planLabelChange(issue(), { add: 'kind:dev,KIND:dev' }), { add: ['kind:dev'], remove: [] });
+});
+
+test('label change: a closed issue gets no state label, but may lose one or change kind', () => {
+  const closed = { state: 'closed', labels: [{ name: 'blocked' }] };
+  assert.throws(() => planLabelChange(closed, { add: 'needs-user' }), /closed issue/);
+  assert.deepStrictEqual(planLabelChange(closed, { remove: 'blocked', add: 'kind:docs' }), { add: ['kind:docs'], remove: ['blocked'] });
 });
 
 test('label change: adding a kind replaces the old one, and unchanged labels are left out', () => {
@@ -86,6 +112,11 @@ test('publish adds one kind label to each issue that has a kind, and none to old
   assert.deepStrictEqual(made.flat().filter(n => n.startsWith('kind:')), []);
 });
 
+test('the dry-run plan shows each kind', () => {
+  const r = publish({}, draft(['design', 'dev', 'bug']));
+  assert.deepStrictEqual(r.plan.map(p => p.kind), ['design', 'dev', 'bug']);
+});
+
 test('a draft with an unknown kind is rejected where it is', () => {
   assert.match(validateDraft(draft(['design', 'dev', 'feature'])).join('\n'), /task T1: kind must be one of/);
   assert.match(validateDraft(draft(['x', 'dev', 'dev'])).join('\n'), /story: kind must be one of/);
@@ -99,4 +130,5 @@ test('the skills tell the agent about kinds and state labels', () => {
   const build = read('skills', 'build', 'SKILL.md');
   for (const l of ['needs-user', 'blocked', 'deferred']) assert.match(build, new RegExp(`\`${l}\``), l);
   assert.match(build, /never blocks a merge or a roll-up/);
+  assert.match(build, /Skip a task labelled `deferred`/);
 });

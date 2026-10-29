@@ -144,6 +144,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   const plan = entries.map(e => ({
     key: e.key,
     type: e.type,
+    kind: e.node.kind || null,
     title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));
