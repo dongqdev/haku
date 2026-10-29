@@ -28,6 +28,10 @@ function readConfig(cwd = process.cwd()) {
     warnings.push(`${file} is not valid JSON (${err.message}); defaults are used`);
     return { config: {}, warnings, file };
   }
+  if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+    warnings.push(`${file} must contain a JSON object; defaults are used`);
+    return { config: {}, warnings, file };
+  }
   if ('titlePrefix' in config && typeof config.titlePrefix !== 'boolean') {
     warnings.push(`titlePrefix in ${file} must be true or false, not ${JSON.stringify(config.titlePrefix)}; the prefix stays on`);
   }

@@ -39,6 +39,18 @@ test('every haku label has its own colour and a description', () => {
   assert.strictEqual(labelStyle('sprint:anything').color, labelStyle('sprint:2026-S01').color);
 });
 
+// GitHub shows white label text when the perceived lightness is below 0.453, black otherwise. A margin
+// keeps every colour clearly on the white side.
+test('every haku label is dark enough for white text on GitHub', () => {
+  const lightness = hex => {
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  for (const n of [BASE_LABEL, typeLabel('story'), typeLabel('milestone'), typeLabel('task'), 'sprint:2026-S10', ownerLabel('x')]) {
+    assert.ok(lightness(labelStyle(n).color) < 0.44, `${n} ${labelStyle(n).color} is too light for white text`);
+  }
+});
+
 test('an unknown label keeps the neutral grey', () => {
   assert.deepStrictEqual(labelStyle('bug'), { color: 'ededed', description: '' });
 });
@@ -81,7 +93,7 @@ test('the host creates labels with the colour and description of their style', (
   host.ensureLabels([typeLabel('task'), 'bug']);
   const task = calls[0];
   assert.deepStrictEqual(task.slice(0, 3), ['label', 'create', 'type:task']);
-  assert.strictEqual(task[task.indexOf('--color') + 1], 'E69F00');
+  assert.strictEqual(task[task.indexOf('--color') + 1], 'C75B00');
   assert.strictEqual(task[task.indexOf('--description') + 1], 'Task: what one worker does');
   assert.ok(task.includes('--force'));
   const bug = calls[1];

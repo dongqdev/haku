@@ -48,7 +48,7 @@ Every task PR is written in Korean with the same sections: 요약 (what), 이유
 
 ## Labels and titles
 
-haku creates its labels with fixed colours (five of them from the Okabe-Ito palette, which stays distinguishable with colour-vision differences; the base label's brown is the mascot's colour): `haku` brown, `type:story` blue, `type:milestone` green, `type:task` orange, `sprint:*` purple, `owner:*` sky blue, each with a short description. Issue titles get a kind prefix, `[Story]`, `[Milestone]` or `[Task]`, so the kind reads without colour; set `"titlePrefix": false` in `.haku/config.json` to switch the prefix off. Existing labels get their colour updated the next time haku ensures them (`gh label create --force`).
+haku creates its labels with fixed colours: hues from the Okabe-Ito palette (distinguishable with colour-vision differences), darkened so GitHub shows white label text, and the mascot's brown for the base label. `haku` brown, `type:story` blue, `type:milestone` green, `type:task` orange, `sprint:*` purple, `owner:*` slate, each with a short description. (GitHub picks the text colour itself from the background's lightness, so white text is reached by darker backgrounds.) Issue titles get a kind prefix, `[Story]`, `[Milestone]` or `[Task]`, so the kind reads without colour; set `"titlePrefix": false` in `.haku/config.json` to switch the prefix off. Existing labels get their colour updated the next time haku ensures them (`gh label create --force`).
 
 ## Ownership
 

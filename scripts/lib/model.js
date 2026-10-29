@@ -11,17 +11,19 @@ const typeLabel = type => `type:${type}`;
 // who cannot be assigned (for example, not a collaborator on the repository).
 const ownerLabel = name => `owner:${name}`;
 
-// Label colours and descriptions. Five colours come from the Okabe-Ito palette (distinguishable with
-// colour-vision differences); the base label's brown is the mascot's own colour. Unknown labels stay grey.
+// Label colours and descriptions. The hues follow the Okabe-Ito palette (distinguishable with colour-vision
+// differences), darkened so GitHub shows white label text: it picks white when the perceived lightness
+// (0.2126 R + 0.7152 G + 0.0722 B, channels 0-1) is below 0.453. The base label's brown is the mascot's own
+// colour. Unknown labels stay grey.
 const LABEL_STYLES = {
-  [BASE_LABEL]: { color: 'A0724A', description: 'Managed by haku' },
+  [BASE_LABEL]: { color: '6F4E37', description: 'Managed by haku' },
   [typeLabel('story')]: { color: '0072B2', description: 'Story: a big goal' },
-  [typeLabel('milestone')]: { color: '009E73', description: 'Milestone: a stage of a story' },
-  [typeLabel('task')]: { color: 'E69F00', description: 'Task: what one worker does' }
+  [typeLabel('milestone')]: { color: '007A5A', description: 'Milestone: a stage of a story' },
+  [typeLabel('task')]: { color: 'C75B00', description: 'Task: what one worker does' }
 };
 const PREFIX_STYLES = [
-  ['sprint:', { color: 'CC79A7', description: 'Sprint' }],
-  ['owner:', { color: '56B4E9', description: 'Owner (could not be assigned)' }]
+  ['sprint:', { color: 'A24B7D', description: 'Sprint' }],
+  ['owner:', { color: '5A6B7B', description: 'Owner (could not be assigned)' }]
 ];
 const NEUTRAL = { color: 'ededed', description: '' };
 

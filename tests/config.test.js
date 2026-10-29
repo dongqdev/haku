@@ -89,3 +89,17 @@ test('publish through the CLI reads the config from a subfolder and honours titl
   assert.strictEqual(r.status, 0, r.stderr);
   assert.deepStrictEqual(JSON.parse(r.stdout).plan.map(p => p.title), ['Login', 'B', 'Model']);
 });
+
+test('a config that is not a JSON object is reported instead of crashing', () => {
+  for (const content of ['null', '"x"', '[1]', '7']) {
+    const { config, warnings } = readConfig(repoWith(content));
+    assert.strictEqual(titlePrefixOn(config), true, content);
+    assert.match(warnings[0], /must contain a JSON object/, content);
+  }
+});
+
+test('the branch command names the branch from the title without its kind prefix', () => {
+  const cli = path.join(__dirname, '..', 'scripts', 'issues.js');
+  const r = spawnSync(process.execPath, [cli, 'branch', '--issue', '5', '--title', '[Task] Model'], { encoding: 'utf8' });
+  assert.strictEqual(r.stdout.trim(), 'task/5-model');
+});
