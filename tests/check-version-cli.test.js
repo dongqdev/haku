@@ -63,10 +63,10 @@ test('a skill change with the same version fails; with a higher version passes',
   assert.strictEqual(good.status, 0, good.stderr);
 });
 
-test('moving a skill out of the plugin counts as a change', () => {
+test('moving a skill into an exempt path still counts as a change (needs --no-renames)', () => {
   const r = prRepo(repo => {
-    fs.mkdirSync(path.join(repo, 'docs'));
-    fs.renameSync(path.join(repo, 'skills/build/SKILL.md'), path.join(repo, 'docs/x.md'));
+    fs.mkdirSync(path.join(repo, 'tests'));
+    fs.renameSync(path.join(repo, 'skills/build/SKILL.md'), path.join(repo, 'tests/x.md'));
   });
   assert.strictEqual(r.status, 1, r.stdout + r.stderr);
 });

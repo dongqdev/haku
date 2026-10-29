@@ -15,6 +15,10 @@ test('everything except docs, tests and CI requires a version bump', () => {
   assert.strictEqual(needsBump(['scripts/lib/model.js']), true);
   assert.strictEqual(needsBump(['.claude-plugin/plugin.json']), true);
   assert.strictEqual(needsBump(['scripts\\lib\\model.js']), true);
+  assert.strictEqual(needsBump(['LICENSE-extra.sh']), true);
+  assert.strictEqual(needsBump(['README.md.js']), true);
+  assert.strictEqual(needsBump(['LICENSES/a.txt']), true);
+  assert.strictEqual(needsBump(['.gitignore-x/a']), true);
   assert.strictEqual(needsBump(['README.md', 'LICENSE', 'tests/a.test.js', '.github/workflows/test.yml']), false);
 });
 
