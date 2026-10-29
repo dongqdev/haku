@@ -17,6 +17,7 @@ const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
+const { patternsFrom, scopeOf, configChanges, renderChanges } = require('./lib/weaken');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
@@ -39,6 +40,7 @@ Usage:
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js accept-close --issue <N> --reason <text> --user-approved [--repo <owner/repo>]
   issues.js pr-body --issue <N>
+  issues.js pr-config-changes --pr <number> [--issue <N>] [--json] [--repo <owner/repo>]
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
   issues.js project-names --names <a,b,c> [--owner <account>]
@@ -52,6 +54,8 @@ accept-close  Records that the user closed a task on purpose without a merged PR
 verify        Exit 0 = pass, 1 = fail, 2 = review needed (see reasons).
 done-check    Exit 0 only when a worker may be deleted.
 project-names Checks candidate repository names against the account's existing repositories (read-only).
+pr-config-changes  Lists the files of a pull request that could weaken its own checks (lint, CI, test runner, .haku); a warning for the
+              merge-approval screen, never a block. Out-of-scope files (not in the task's Scope) come first.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
@@ -245,6 +249,18 @@ function main(argv) {
       needIssue(opts);
       process.stdout.write(skeleton(opts.issue));
       return 0;
+    case 'pr-config-changes': {
+      if (opts.pr === undefined || !(Number.isInteger(opts.pr) && opts.pr > 0)) throw new Error('--pr <number> is required');
+      const h = host();
+      const cfg = readConfig(opts.cwd || process.cwd());
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      const scope = Number.isInteger(opts.issue) ? scopeOf(h.getIssue(opts.issue).body) : null;
+      const found = configChanges(h.prFiles(opts.pr), { patterns: patternsFrom(cfg.config), scope });
+      if (opts.json) out({ pr: opts.pr, changes: found });
+      else process.stdout.write(renderChanges(found));
+      // a warning, not a block: exit 0 whether or not something was found
+      return 0;
+    }
     case 'pr-check': {
       needIssue(opts);
       if (!opts.file && opts.pr === undefined) throw new Error('--file <body.md> or --pr <number> is required');

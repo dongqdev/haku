@@ -35,6 +35,10 @@ You normally type only these two. `plan` hands a vague goal to `sniff` first and
 4. Merging needs the user's approval per PR (the screen lists the issues that will close). Automatic merging exists only as an explicit per-story opt-in for verified T1/T2 work.
 5. After the merge: verification on the default branch, `reconcile` closes merged-but-open tasks and rolls up milestones and stories, then the worker is deleted - only if its summary and passing verification are recorded. `reconcile` does not roll a story or milestone up over a task that was closed without a merged pull request (closed by hand, only an open or an unmerged pull request, or not checkable): it reports the task and why, and the user decides with a choice question; `issues.js accept-close --issue N --reason <why>` records a task closed on purpose and lets its parent roll up.
 
+## Check-weakening warning
+
+`issues.js pr-config-changes --pr <number> --issue <N>` lists the files of a pull request that could make its own checks easier to pass: lint, format and type settings, test runner settings, CI workflows, git hooks and `.haku/`. `build` shows the list in the merge-approval question as "검사 설정 변경", with files outside the task's `Scope` first and marked. It is a warning, never a block. A repository can add patterns in `.haku/config.json` (`"watchFiles": ["build/**"]`); the built-in patterns cannot be switched off from there.
+
 ## Releases
 
 Claude Code keeps an installed plugin in a cache keyed by its **version**, so a merged change that keeps the version never reaches an installed copy (`plugin update` answers "already at the latest version"). Every PR that changes `skills/`, `agents/`, `scripts/` or `.claude-plugin/` must therefore raise the version in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`; CI (`scripts/check-version.js`) enforces this. Use a patch bump for fixes, a minor bump for new behavior, and a minor bump with a note for renames while the version is below 1.0.
