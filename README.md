@@ -21,6 +21,7 @@ Then in the repository you want to work on:
 
 ```
 /haku:setup         # once per repository: checks, plan, approval, setup PR
+                    # outside any repository it starts a new project: names, folder, repo
 /haku:plan          # goal -> draft -> approval -> issues -> build
 ```
 

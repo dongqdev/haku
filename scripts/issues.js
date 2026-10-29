@@ -17,6 +17,7 @@ const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
+const { listRepoNames, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
 
@@ -39,16 +40,20 @@ Usage:
   issues.js pr-body --issue <N>
   issues.js pr-check --issue <N> --file <body.md>
   issues.js branch --issue <N> --title <text>
+  issues.js project-names --names <a,b,c> [--owner <account>]
+  issues.js project-new --name <repo> --dir <parent folder> [--owner <account>] [--visibility private|public] [--apply]
 
 publish       Dry-run by default; --apply creates the story/milestone/task issues.
               Progress is kept in <draft>.map.json so an interrupted run resumes.
 reconcile     Dry-run by default; --apply closes merged-but-open tasks and rolls up.
 verify        Exit 0 = pass, 1 = fail, 2 = review needed (see reasons).
 done-check    Exit 0 only when a worker may be deleted.
+project-names Checks candidate repository names against the account's existing repositories (read-only).
+project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -239,6 +244,31 @@ function main(argv) {
         for (const p of result.problems) console.log(`  - ${p}`);
       }
       return result.ok ? 0 : 1;
+    }
+    case 'project-names': {
+      if (!opts.names) throw new Error('--names <a,b,c> is required');
+      const user = readUserConfig();
+      for (const w of user.warnings) console.error(`[haku] warning: ${w}`);
+      const owner = opts.owner || null;
+      out({
+        owner,
+        prefix: user.repoPrefix,
+        defaults: { projectsDir: user.projectsDir, visibility: user.visibility },
+        candidates: checkNames(opts.names.split(',').filter(n => n.trim()), { owner, prefix: user.repoPrefix, existing: listRepoNames(owner) })
+      });
+      return 0;
+    }
+    case 'project-new': {
+      if (!opts.name || !opts.dir) throw new Error('--name and --dir are required');
+      const plan = planProject({ name: opts.name, parentDir: path.resolve(opts.dir), owner: opts.owner || null, visibility: opts.visibility || 'private' });
+      if (!opts.apply) {
+        out({ dryRun: true, ...plan });
+        return 0;
+      }
+      // The name is checked again right before the remote write; a clash found now stops everything.
+      if (listRepoNames(plan.owner).includes(plan.name.toLowerCase())) throw new Error(`a repository named ${plan.name} already exists`);
+      out(createProject(plan));
+      return 0;
     }
     case 'branch':
       needIssue(opts);
