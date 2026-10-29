@@ -240,7 +240,7 @@ test('outside a git repository, or with a missing --cwd value, the check is an e
 test('the workflow runs the check, and the README and setup say how to use and allow', () => {
   const yml = fs.readFileSync(path.join(root, '.github', 'workflows', 'test.yml'), 'utf8');
   assert.match(yml, /node scripts\/check-personal-paths\.js/);
-  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  const readme = fs.readFileSync(path.join(root, 'README.en.md'), 'utf8');
   assert.match(readme, /check-personal-paths\.js/);
   assert.match(readme, /haku:allow-personal-path/);
   assert.match(readme, /personal-paths-allow\.txt/);
