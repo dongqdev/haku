@@ -64,7 +64,7 @@ Run `issues.js publish <draft>` **without** `--apply`. It validates the draft an
 Show the user, in Korean: the story goal, a table of milestones and tasks (title, verify tier, scope, dependencies), which tasks can run in parallel, the maximum workers, and the merge mode. Ask with a choice question (literal UTF-8 text, no `\uXXXX` escapes): approve, edit, or cancel. Offer the merge mode here:
 
 - **approve-each** (default): the user approves every merge.
-- **auto-when-verified**: allowed only if every task is T1/T2 and `issues.js branch-protection` reports the default branch as `protected`; T3 tasks never auto-merge. With any other state (`unprotected`, `unavailable`, `unknown`) offer `approve-each` only and say why in one sentence.
+- **auto-when-verified**: allowed only if every task is T1/T2 and `issues.js branch-protection` reports the default branch as `protected`; T3 tasks never auto-merge. With any other state (`weak`, `ruleset`, `unprotected`, `unavailable`, `unknown`) offer `approve-each` only and say why in one sentence. Write the chosen mode into the draft as `story.mergeMode`; `publish` records it on the story issue as a `Merge-Mode:` line, which `build` reads. A command that fails counts as `unknown`.
 
 Full automatic merging without verification is not offered.
 

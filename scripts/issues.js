@@ -19,7 +19,7 @@ const { buildStatus, renderStatus } = require('./lib/status');
 const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 const { renderChanges } = require('./lib/weaken');
 const { prConfigChanges } = require('./lib/pr-config');
-const { protectionReport, renderProtection } = require('./lib/protection');
+const { checkProtection, renderProtection } = require('./lib/protection');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
@@ -42,7 +42,7 @@ Usage:
   issues.js issue-close --issue <N> --reason <text> [--repo <owner/repo>]
   issues.js accept-close --issue <N> --reason <text> --user-approved [--repo <owner/repo>]
   issues.js pr-body --issue <N>
-  issues.js branch-protection [--json] [--repo <owner/repo>]
+  issues.js branch-protection [--mode <approve-each|auto-when-verified> | --story <N>] [--json] [--repo <owner/repo>]
   issues.js pr-config-changes --pr <number> [--issue <N>] [--json] [--repo <owner/repo>]
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
@@ -65,7 +65,7 @@ project-new   Dry-run by default; --apply creates the folder, the first commit a
 `;
 
 const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -87,6 +87,7 @@ function parse(argv) {
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
+  if (opts.story !== undefined) opts.story = Number(opts.story);
   if (opts.pr !== undefined) opts.pr = /^[1-9]\d*$/.test(opts.pr) ? Number(opts.pr) : NaN;
   return opts;
 }
@@ -255,12 +256,16 @@ function main(argv) {
       process.stdout.write(skeleton(opts.issue));
       return 0;
     case 'branch-protection': {
-      const h = host();
       const cfg = readConfig(opts.cwd || process.cwd());
       for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
-      const report = protectionReport(h.branchProtection(h.defaultBranch()), cfg.config.mergeMode);
+      // Exit 0: the requested merge mode may be used. Exit 3: it may not (asking is the answer).
+      const { report, exitCode } = checkProtection({
+        host: { getIssue: n => host().getIssue(n), branchProtection: b => host().branchProtection(b), defaultBranch: () => host().defaultBranch() },
+        mode: opts.mode, story: opts.story, repoGiven: Boolean(opts.repo), configMode: cfg.config.mergeMode,
+        warn: m => console.error(`[haku] warning: ${m}`)
+      });
       if (opts.json) out(report); else process.stdout.write(renderProtection(report));
-      return 0;
+      return exitCode;
     }
     case 'pr-config-changes': {
       if (opts.pr === undefined || !(Number.isInteger(opts.pr) && opts.pr > 0)) throw new Error('--pr <number> is required');

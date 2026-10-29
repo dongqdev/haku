@@ -42,7 +42,7 @@ If the current folder is not inside a Git repository with an `origin` (`git rev-
 | Git repo with `origin` | `git remote get-url origin` | stop |
 | GitHub CLI logged in | `gh auth status` | tell the user to run `gh auth login` themselves; do not handle credentials |
 | Default branch | `gh repo view --json defaultBranchRef` | stop |
-| Default-branch protection | `issues.js branch-protection` (read-only) | report its state in plain words: `protected` / `unprotected` (can be turned on in the repository settings) / `unavailable` (the plan does not allow it: private repository on a free plan) / `unknown` (could not be checked). Never change the setting silently |
+| Default-branch protection | `issues.js branch-protection` (read-only) | report its state in plain words: `protected` (rules require a pull request and apply to administrators too) / `weak` (rules exist but are too loose) / `ruleset` (guarded by a ruleset whose bypass list cannot be seen) / `unprotected` (can be turned on in the repository settings) / `unavailable` (the plan does not allow it: private repository on a free plan) / `unknown` (could not be checked). Never change the setting silently |
 | `.haku/verify.json` on the default branch | `git show <base>:.haku/verify.json` | propose a starter file (step 3) |
 | Config scope | is `CLAUDE_CONFIG_DIR` set, and where does it point? | state which settings folder this install affects |
 

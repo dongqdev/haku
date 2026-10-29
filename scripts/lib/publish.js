@@ -24,6 +24,7 @@ function validateDraft(draft) {
     need(String(title).length <= MAX_TITLE, `${where}: title is longer than ${MAX_TITLE} characters`);
   };
   if (draft && draft.story) checkTitle('story', draft.story.title);
+  if (draft && draft.story && draft.story.mergeMode !== undefined) need(['approve-each', 'auto-when-verified'].includes(draft.story.mergeMode), 'story.mergeMode must be approve-each or auto-when-verified'); 
   need(draft && Array.isArray(draft.milestones) && draft.milestones.length > 0, 'at least one milestone is required');
   if (errors.length) return errors;
 
@@ -113,6 +114,7 @@ function renderBody(entry, numbers, children = []) {
   if (parent) lines.push(`Parent: #${numbers.get(parent)}`);
   lines.push(`Verify-Kind: ${node.verify.kind}`);
   if (node.verify.profile) lines.push(`Verify-Profile: ${node.verify.profile}`);
+  if (type === 'story' && node.mergeMode) lines.push(`Merge-Mode: ${node.mergeMode}`);
   if (node.scope) lines.push(`Scope: ${node.scope.join(', ')}`);
   if ((node.dependsOn || []).length) {
     lines.push(`Depends-On: ${node.dependsOn.map(d => `#${numbers.get(d)}`).join(', ')}`);

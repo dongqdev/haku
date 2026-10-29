@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { BASE_LABEL, ownerLabel, labelStyle } = require('./model');
 const { readAllPages, readAllCursors, readStable } = require('./paginate');
-const { classifyProtection } = require('./protection');
+const { classifyProtection, classifyRulesets } = require('./protection');
 
 // GitHub host over the gh CLI. Arguments are always passed as an array (no shell),
 // and bodies go through temp files, so quoting behaves the same on Windows/macOS/Linux.
@@ -118,11 +118,19 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
     branchProtection(branch) {
       const route = `repos/${repoSlug()}/branches/${String(branch).split('/').map(encodeURIComponent).join('/')}/protection`;
       try {
-        gh(['api', ...apiHost, route]);
-        return classifyProtection({ ok: true });
+        return classifyProtection({ ok: true, body: gh(['api', ...apiHost, route]) });
       } catch (err) {
-        const text = [err && err.stdout, err && err.stderr, err && err.message].filter(Boolean).map(String).join('\n');
-        return classifyProtection({ ok: false, text });
+        // gh prints the body of an error answer on stdout and its own line on stderr; the failed command line (in
+        // `message`) is left out so the branch name can never be mistaken for the answer.
+        const text = [err && err.stdout, err && err.stderr].filter(Boolean).map(String).join('\n');
+        const state = classifyProtection({ ok: false, text });
+        if (state !== 'unprotected') return state;
+        // No classic rule: a ruleset may guard the branch instead.
+        try {
+          return classifyRulesets(gh(['api', ...apiHost, `repos/${repoSlug()}/rules/branches/${String(branch).split('/').map(encodeURIComponent).join('/')}`])) || state;
+        } catch (e) {
+          return state;
+        }
       }
     },
 
