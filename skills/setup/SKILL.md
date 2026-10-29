@@ -18,9 +18,10 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 Start by printing this banner once, exactly as written, then continue:
 
 ```text
- /\__/\
-( o  w o )  haku
- \_vv__/    Harness Assistant Keeping Users in the loop
+ /\___/\
+( o w o )  haku
+ \_vvv_/   Harness Assistant
+           Keeping Users in the loop
 ```
 
 ## 0. No repository yet? Start a new project
