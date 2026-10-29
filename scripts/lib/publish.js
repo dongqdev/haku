@@ -1,6 +1,6 @@
 'use strict';
 
-const { BASE_LABEL, typeLabel, withPrefix, stripPrefix } = require('./model');
+const { BASE_LABEL, typeLabel, kindLabel, WORK_KINDS, withPrefix, stripPrefix } = require('./model');
 
 // GitHub rejects titles over 256 characters; the prefix adds up to 12, so a draft title may use 244.
 const MAX_TITLE = 244;
@@ -10,6 +10,7 @@ const KINDS = ['T1', 'T2', 'T3'];
 // A draft is the locally written, user-approved plan:
 // { assignee, sprint?, story:{id,title,body?,verify}, milestones:[{id,title,body?,verify,
 //   tasks:[{id,title,body?,acceptance:[..],verify,scope:[..],dependsOn?:[ids]}]}] }
+// Every story, milestone and task may carry kind: design|dev|bug|docs|research|chore (becomes a kind:<name> label).
 function validateDraft(draft) {
   const errors = [];
   const ids = new Set();
@@ -37,6 +38,12 @@ function validateDraft(draft) {
       errors.push(`${where}: verify.profile is required for ${v.kind} (a name defined in .haku/verify.json)`);
     }
   };
+  // The kind of work (design, dev, ...) is optional so older drafts still publish; when given it must be known.
+  const checkKind = (where, node) => {
+    if (node.kind !== undefined && !WORK_KINDS.includes(node.kind)) {
+      errors.push(`${where}: kind must be one of ${WORK_KINDS.join('|')}`);
+    }
+  };
   const uniq = (where, id) => {
     if (!id) errors.push(`${where}: id is required`);
     else if (ids.has(id)) errors.push(`${where}: duplicate id ${id}`);
@@ -44,6 +51,7 @@ function validateDraft(draft) {
   };
 
   uniq('story', draft.story.id);
+  checkKind('story', draft.story);
   checkVerify('story', draft.story.verify);
 
   const taskIds = new Set();
@@ -52,6 +60,7 @@ function validateDraft(draft) {
     need(m.title, `milestone ${m.id}: title is required`);
     checkTitle(`milestone ${m.id}`, m.title);
     checkVerify(`milestone ${m.id}`, m.verify);
+    checkKind(`milestone ${m.id}`, m);
     need(Array.isArray(m.tasks) && m.tasks.length > 0, `milestone ${m.id}: needs at least one task`);
     for (const t of m.tasks || []) {
       const where = `task ${t.id || '?'}`;
@@ -62,6 +71,7 @@ function validateDraft(draft) {
       need(Array.isArray(t.acceptance) && t.acceptance.length > 0, `${where}: acceptance criteria are required`);
       need(Array.isArray(t.scope) && t.scope.length > 0, `${where}: scope (files this task may touch) is required`);
       checkVerify(where, t.verify);
+      checkKind(where, t);
     }
   }
   for (const m of draft.milestones) {
@@ -134,6 +144,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   const plan = entries.map(e => ({
     key: e.key,
     type: e.type,
+    kind: e.node.kind || null,
     title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));
@@ -141,6 +152,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
 
   const labelsFor = e => {
     const l = [BASE_LABEL, typeLabel(e.type)];
+    if (e.node.kind) l.push(kindLabel(e.node.kind));
     if (draft.sprint) l.push(`sprint:${draft.sprint}`);
     return l;
   };

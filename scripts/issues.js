@@ -11,7 +11,8 @@ const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
-const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
+const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitions } = require('./lib/model');
+const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
@@ -45,6 +46,8 @@ Usage:
   issues.js branch-protection [--mode <approve-each|auto-when-verified> | --story <N>] [--json] [--repo <owner/repo>]
   issues.js pr-config-changes --pr <number> [--issue <N>] [--json] [--repo <owner/repo>]
   issues.js pr-check --issue <N> [--file <body.md>] [--pr <number>] [--repo <owner/repo>]
+  issues.js labels [--apply] [--json] [--repo <owner/repo>]
+  issues.js label --issue <N> [--add <a,b>] [--remove <c>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
   issues.js project-names --names <a,b,c> [--owner <account>]
   issues.js project-new --name <repo> --dir <parent folder> [--owner <account>] [--visibility private|public] [--apply]
@@ -61,10 +64,13 @@ branch-protection  Reports whether the default branch is protected (protected, u
               and which merge modes are allowed: without protection only approve-each. Read-only.
 pr-config-changes  Lists the files of a pull request that could weaken its own checks (lint, CI, test runner, .haku); a warning for the
               merge-approval screen, never a block. Out-of-scope files (not in the task's Scope) come first.
+labels        Lists the labels haku owns (base, type, kind, state) with colours; --apply creates them on the repository.
+label         Adds or removes one issue's state labels (deferred, blocked, needs-user) and sets its kind label; an issue keeps
+              exactly one kind. Other labels are refused.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
-const VALUE = new Set(['--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
+const VALUE = new Set(['--add', '--remove', '--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
   '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story']);
 
 function parse(argv) {
@@ -316,6 +322,22 @@ function main(argv) {
       // The name is checked again right before the remote write; a clash found now stops everything.
       if (repoExists(plan.owner, plan.name)) throw new Error(`a repository named ${plan.name} already exists`);
       out(createProject(plan));
+      return 0;
+    }
+    case 'labels': {
+      const defs = opts.apply ? ensureBaseLabels(host()) : baseLabelDefinitions();
+      if (opts.json) out(defs);
+      else for (const d of defs) console.log(`${d.name}\t${d.color}\t${d.description}`);
+      // a summary line must not break the JSON on stdout
+      if (opts.apply) (opts.json ? console.error : console.log)(`${defs.length} labels ensured`);
+      return 0;
+    }
+    case 'label': {
+      needIssue(opts);
+      const h = host();
+      const change = planLabelChange(h.getIssue(opts.issue), { add: opts.add, remove: opts.remove });
+      h.setLabels(opts.issue, change);
+      console.log(`#${opts.issue}: +[${change.add.join(', ')}] -[${change.remove.join(', ')}]`);
       return 0;
     }
     case 'branch':

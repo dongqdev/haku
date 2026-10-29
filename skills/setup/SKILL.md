@@ -61,13 +61,13 @@ Print the exact list of files and remote objects that would be created:
 - a starter `.haku/verify.json` with profiles detected from the repository (e.g. `package.json` test script -> profile `unit` with `countPattern` and `minTests: 1`)
 - `.github/pull_request_template.md` with the Korean PR sections (요약, 이유, 변경 내용, 테스트, 위험과 영향); copy it from `${CLAUDE_PLUGIN_ROOT}/.github/pull_request_template.md` unless the repository already has one
 - `.gitattributes` and `.editorconfig`, **only when the repository has no `.gitattributes`** (never overwrite an existing one; if it exists without `eol=lf`, mention that line endings may differ between systems and leave the choice to the user). Without them a Windows checkout turns files into CRLF and checks that compare bytes can fail there. Use `* text=auto eol=lf` plus `binary` lines for images and archives in `.gitattributes`, and `root = true`, `charset = utf-8`, `end_of_line = lf`, `insert_final_newline = true` in `.editorconfig`; copy `${CLAUDE_PLUGIN_ROOT}/.gitattributes` and `${CLAUDE_PLUGIN_ROOT}/.editorconfig` as the starting point. If the repository already has CRLF files, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/check-eol.js"` before proposing it: adding `* text=auto eol=lf` makes git rewrite those files at the next commit, so ask the user with a choice question whether to include a separate commit with `git add --renormalize .` or to leave it out and keep the existing line endings. Tell the user that `node "${CLAUDE_PLUGIN_ROOT}/scripts/check-eol.js" --worktree` checks committed files and the checkout for CRLF (it needs no dependencies) and can be added to the repository's CI.
-- the base labels (`haku`, `type:story|milestone|task`; `owner:<name>` is created only when someone cannot be assigned)
+- the base labels: `haku`, `type:story|milestone|task`, `kind:design|dev|bug|docs|research|chore` and the state labels `deferred`, `blocked`, `needs-user` (`issues.js labels` lists them with their colours; `owner:<name>` is created only when someone cannot be assigned)
 
 Rules for the apply step:
 
 - Ask for approval with a choice question. Nothing is written before the answer.
 - **Never push to the default branch** (the first commit of a brand-new empty repository in step 0 is the only exception). `verify.json` must reach the default branch through a normal PR, because verification reads it from there. Create it on a branch `chore/haku-setup`, open the PR, and tell the user it needs their merge.
-- Labels are created with `gh label create <name> --force`.
+- Labels are created with `issues.js labels --apply`, which uses haku's own colours and descriptions.
 - Do not edit global Claude settings, rules or hooks here. If the user wants hooks, show the plan and ask separately.
 
 ## 4. Finish

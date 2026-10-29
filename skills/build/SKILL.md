@@ -15,7 +15,7 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 
 ## Loop
 
-1. **Pick ready tasks.** Open `type:task` children whose `Depends-On` issues are closed and whose `Scope` does not overlap a running task. Never exceed `maxWorkers`.
+1. **Pick ready tasks.** Open `type:task` children whose `Depends-On` issues are closed and whose `Scope` does not overlap a running task. Skip a task labelled `deferred` (the user postponed it) or `blocked`. Never exceed `maxWorkers`.
 2. **Start a worker per task.** Read `issues.js config`: `worker.mode` is `subagent` (the default) or `session`. Workers cannot plan stories or start workers.
    - **subagent:** `issues.js worker-start --issue N --title "<task title>" --base <default branch>`, then launch the `worker` agent with a brief containing the worktree path, the issue number and its acceptance criteria, its scope, the branch name, and the rules below.
    - **session:** `issues.js worker-launch --issue N --orchestrator <your session name>`. It creates the worktree and starts the worker as its own background session (visible in the Claude app unless `workerRemoteControl` is false). The worker follows `agents/worker.md`; its instructions are short and bounded, and the full issue text is written to `.haku-issue.md` in the worktree (git ignores it) for the worker to read as data. Find your own session name with ListAgents (it says "This session is <name>"). If the session cannot be started the worktree is removed again and the error says why (for example the repository has not been trusted yet in an interactive `claude`).
@@ -41,6 +41,16 @@ Ask the user to decide only through a choice question (AskUserQuestion), never a
 - The PR body follows the `pr-body` skeleton in Korean (요약, 이유, 변경 내용, 테스트, 위험과 영향) and contains exactly the closing line it gives. Do not write other closing keywords.
 - Do not delete, skip or weaken tests to get a pass.
 - Record each acceptance criterion as met or unmet with evidence (command output, file, screenshot); finish with a summary of what was done, what was tried and failed, and open risks.
+
+## Labels that say why an issue is not moving
+
+Keep the state labels in step with what is really happening, with `issues.js label --issue N --add <label>` and `--remove <label>`:
+
+- `needs-user` while the task waits for something only the user can give: a decision (a merge approval, a T3 verdict, a question from the worker) or an approval a blocked worker needs. Remove it when the user has answered.
+- `blocked` while the task cannot go on for a reason that is not the user's to give (an unmet `Depends-On`, a failing platform CI). If both would fit, use `needs-user`. Remove it when that is resolved.
+- `deferred` when the user chose to postpone the task; it stays open and is not dropped. Remove it when work resumes.
+
+`label` only touches these three and the `kind:*` labels, so it can never change `haku`, `type:*` or `sprint:*`. Labels are a view for the user, not a gate: a missing or stale label never blocks a merge or a roll-up. The one effect is in step 1: `deferred` and `blocked` tasks are not started. `label` refuses to add a state label to a closed issue.
 
 ## Measurement document (T3)
 

@@ -31,11 +31,11 @@ Write the draft to `.haku/drafts/<slug>.json` (local only):
 {
   "assignee": "<from config>",
   "sprint": "optional YYYY-SNN",
-  "story": { "id": "S", "title": "...", "body": "why and outcome", "verify": { "kind": "T1", "profile": "unit" } },
+  "story": { "id": "S", "title": "...", "kind": "design", "body": "why and outcome", "verify": { "kind": "T1", "profile": "unit" } },
   "milestones": [{
-    "id": "M1", "title": "...", "verify": { "kind": "T1", "profile": "unit" },
+    "id": "M1", "title": "...", "kind": "dev", "verify": { "kind": "T1", "profile": "unit" },
     "tasks": [{
-      "id": "T1", "title": "...",
+      "id": "T1", "title": "...", "kind": "dev",
       "acceptance": ["observable, checkable criterion"],
       "scope": ["src/feature/**", "tests/feature/**"],
       "verify": { "kind": "T1", "profile": "unit" },
@@ -47,6 +47,7 @@ Write the draft to `.haku/drafts/<slug>.json` (local only):
 
 Rules for a good draft:
 
+- Give the story, every milestone and every task a **`kind`**: `design` (decide the approach and scope), `dev` (build or change a feature), `bug` (fix something broken), `docs`, `research` (find out and conclude) or `chore` (setup, refactor, dependencies, no behavior change). It becomes one `kind:<name>` label; pick the one that says what the work mostly is. Validation rejects any other value.
 - One task = one worker = one branch = one reviewable PR. Split anything larger.
 - Every task needs **acceptance** criteria a command or a person can check, and a **scope** (the files it may touch). Tasks whose scopes overlap must be ordered with `dependsOn` so they never run in parallel.
 - Choose the verification tier per task:
