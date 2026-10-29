@@ -29,7 +29,7 @@ test('the detector catches every respelling of the old names', () => {
   const old = ['ecc', 'harness'];
   const spellings = [
     old.join('-'), old.join('_').toUpperCase(), old.join(' '), old.join(''), 'Ecc' + 'Harness', old.join('.'),
-    "path.join(os.homedir(), '." + 'eh' + "')", 'C:\\Users\\x\\.' + 'eh' + '\\w', '~/.' + 'eh' + '/w', '.' + 'eh'
+    "path.join(os.homedir(), '." + 'eh' + "')", 'C:\\Users\\<name>\\.' + 'eh' + '\\w', '~/.' + 'eh' + '/w', '.' + 'eh'
   ];
   for (const s of spellings) assert.ok(findOld(s).length > 0, `not detected: ${s}`);
   for (const ok of ['haku-harness', '.haku/w', 'the ECC project', 'some.method()', 'whenever']) {
