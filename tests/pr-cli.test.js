@@ -37,3 +37,11 @@ test('pr-check without --file is an error', () => {
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /--file/);
 });
+
+test('pr-check refuses a --pr that is not a plain positive number', () => {
+  for (const bad of ['abc', '0', '-5', '1e1', '0x10', '1.5']) {
+    const r = run('pr-check', '--issue', '3', '--pr', bad);
+    assert.strictEqual(r.status, 1, bad);
+    assert.match(r.stderr, /pull request number|needs a value/, bad);
+  }
+});
