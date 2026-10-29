@@ -1,0 +1,26 @@
+# Text is stored with LF and checked out with LF on every system, so a Windows runner does not turn files into CRLF.
+* text=auto eol=lf
+
+# Binary files are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.webp binary
+*.mp3 binary
+*.mp4 binary
+*.mov binary
+*.gz binary
+*.tgz binary
+*.jar binary
+*.exe binary
+*.dll binary
+*.icns binary
