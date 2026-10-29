@@ -164,6 +164,8 @@ function listSessions(options = {}) {
   return readSessions(options) || [];
 }
 
+const sameId = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+
 const runOne = (spawn, claudeBin, args) => {
   try {
     const r = spawn(claudeBin, args, { encoding: 'utf8', timeout: SESSION_TIMEOUT_MS });
@@ -180,10 +182,12 @@ const stopOnly = ({ id, claudeBin = claudeCommand(), spawn = spawnSync }) => {
   const r = runOne(spawn, claudeBin, ['stop', id]);
   if (r.ok) return { stopped: true, error: null };
   // `stop` also fails for a session that no longer exists, which is exactly what we want: it is not running.
+  // A stop that timed out says nothing about whether the session is still running.
+  if (/timed out|ETIMEDOUT/i.test(String(r.error))) return { stopped: false, error: r.error };
   // If the list itself cannot be read nothing is known, and "could not stop" stays the answer.
   const sessions = readSessions({ claudeBin, spawn });
   if (sessions === null) return { stopped: false, error: r.error || 'the list of sessions could not be read' };
-  const stillThere = sessions.some(a => a && String(a.id) === String(id));
+  const stillThere = sessions.some(a => a && sameId(a.id, id));
   return stillThere ? { stopped: false, error: r.error } : { stopped: true, gone: true, error: null };
 };
 const removeSession = ({ id, claudeBin = claudeCommand(), spawn = spawnSync }) => {
@@ -241,10 +245,12 @@ function launchWorker({ host, cwd, issue, orchestrator, repo = null, base, home,
 // session is `blocked` is waiting for an approval nobody has given; it cannot report, so it is never "just slow".
 function withSessionStates(records, { claudeBin, spawn } = {}) {
   if (!records.some(r => r.sessionId)) return records;
-  const sessions = new Map(listSessions({ claudeBin, spawn }).map(a => [String(a.id), a]));
+  const list = readSessions({ claudeBin, spawn });
   return records.map(r => {
     if (!r.sessionId) return r;
-    const s = sessions.get(String(r.sessionId));
+    // an unreadable list says nothing about a session: it is unknown, not gone
+    if (list === null) return { ...r, sessionState: 'unknown' };
+    const s = list.find(a => a && sameId(a.id, r.sessionId));
     return { ...r, sessionState: s ? (s.state || s.status || 'unknown') : 'gone' };
   });
 }

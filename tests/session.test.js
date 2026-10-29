@@ -234,13 +234,16 @@ const agentsSpawn = (list, calls = []) => (bin, args) => {
   return { status: 0, stdout: '', stderr: '' };
 };
 
-test('the live state of session workers is shown, and a missing session is reported as gone', () => {
+test('the live state of session workers is shown, a missing session is gone, an unreadable list makes them unknown', () => {
   const records = [{ issue: 1, sessionId: 'aa' }, { issue: 2, sessionId: 'bb' }, { issue: 3, sessionId: 'cc' }, { issue: 4 }];
   const spawn = agentsSpawn([{ id: 'aa', state: 'blocked' }, { id: 'bb', status: 'done' }]);
   assert.deepStrictEqual(withSessionStates(records, { claudeBin: 'claude', spawn }).map(r => r.sessionState), ['blocked', 'done', 'gone', undefined]);
   // nothing to look up without session workers: claude is not even called
   assert.deepStrictEqual(withSessionStates([{ issue: 4 }], { claudeBin: 'claude', spawn: () => assert.fail('no call') }), [{ issue: 4 }]);
   assert.deepStrictEqual(listSessions({ claudeBin: 'claude', spawn: () => ({ status: 1, stdout: '' }) }), [], 'an unreadable list is empty, not an error');
+  const unreadable = withSessionStates(records, { claudeBin: 'claude', spawn: () => ({ status: 1, stdout: '' }) });
+  assert.deepStrictEqual(unreadable.map(r => r.sessionState), ['unknown', 'unknown', 'unknown', undefined], 'never claim a session is gone when the list could not be read');
+  assert.strictEqual(withSessionStates([{ issue: 1, sessionId: 'AbC' }], { claudeBin: 'claude', spawn: agentsSpawn([{ id: 'abc', state: 'done' }]) })[0].sessionState, 'done', 'ids compare without regard to letter case');
 });
 
 // ---- the whole launch, with real git and a fake claude
@@ -569,4 +572,11 @@ test('a list of sessions that cannot be read is told apart from an empty list', 
   // a stop that fails while the list cannot be read stays a failure
   const r = stopOnly({ id: 'abc', claudeBin: 'claude', spawn: (b, a) => (a[0] === 'agents' ? { status: 1, stdout: '' } : { status: 1, stdout: '', stderr: 'cannot stop' }) });
   assert.strictEqual(r.stopped, false);
+});
+
+test('a stop that timed out is a failure even when the session is not in the list; letter case of ids does not matter', () => {
+  const timedOut = stopOnly({ id: 'abc', claudeBin: 'claude', spawn: (b, a) => (a[0] === 'agents' ? { status: 0, stdout: '[]' } : { error: Object.assign(new Error('spawnSync claude ETIMEDOUT'), { code: 'ETIMEDOUT' }) }) });
+  assert.strictEqual(timedOut.stopped, false);
+  const sameButUpper = stopOnly({ id: 'abc123', claudeBin: 'claude', spawn: (b, a) => (a[0] === 'agents' ? { status: 0, stdout: JSON.stringify([{ id: 'ABC123' }]) } : { status: 1, stdout: '', stderr: 'cannot stop' }) });
+  assert.strictEqual(sameButUpper.stopped, false, 'ABC123 is the same session as abc123');
 });
