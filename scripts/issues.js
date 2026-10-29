@@ -11,7 +11,7 @@ const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { skeleton, checkBody } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
-const { buildTriage, renderTriage } = require('./lib/triage');
+const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 
 const HELP = `haku issues
 
@@ -51,7 +51,12 @@ function parse(argv) {
     else if (arg === '--trust-working-copy') opts.trust = true;
     else if (arg === '--abandon') opts.abandon = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
-    else if (VALUE.has(arg)) opts[arg.slice(2)] = argv[++i];
+    else if (VALUE.has(arg)) {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) throw new Error(`${arg} needs a value`);
+      opts[arg.slice(2)] = value;
+      i += 1;
+    }
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
@@ -157,15 +162,15 @@ function main(argv) {
       return 0;
     }
     case 'triage': {
-      const t = buildTriage(host().listIssues());
+      const t = buildTriage(host().listBacklog());
       if (opts.json) out(t); else process.stdout.write(renderTriage(t));
       return 0;
     }
     case 'issue-close': {
       needIssue(opts);
       if (!opts.reason || !opts.reason.trim()) throw new Error('--reason <text> is required: say why the issue is closed');
-      host().closeIssue(opts.issue, `Closed by haku triage: ${opts.reason.trim()}`);
-      console.log(`#${opts.issue} closed`);
+      closeForTriage(host(), opts.issue, opts.reason);
+      console.log(`#${opts.issue} closed as not planned`);
       return 0;
     }
     case 'pr-body':

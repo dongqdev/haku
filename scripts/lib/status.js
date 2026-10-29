@@ -18,17 +18,21 @@ function buildStatus(issues, workers = []) {
   const byNumber = new Map(issues.map(i => [i.number, i]));
   const tasks = issues.filter(i => issueType(i) === 'task');
   const stories = new Map();
+  const running = new Set(workers.map(w => w.issue));
   const ready = [];
   const blocked = [];
   const unattached = [];
+  const underClosedStory = [];
 
   for (const t of tasks) {
     const story = storyOf(t, byNumber);
-    if (!story) { unattached.push(t.number); continue; }
+    if (!story) { if (t.state === 'open') unattached.push(t.number); continue; }
     if (!stories.has(story.number)) stories.set(story.number, { number: story.number, title: story.title, open: 0, closed: 0 });
     stories.get(story.number)[t.state === 'closed' ? 'closed' : 'open'] += 1;
 
     if (t.state === 'closed') continue;
+    if (story.state === 'closed') { underClosedStory.push(t.number); continue; }
+    if (running.has(t.number)) continue;
     const waiting = dependsOn(t).filter(n => !byNumber.has(n) || byNumber.get(n).state !== 'closed');
     if (waiting.length) blocked.push({ number: t.number, title: t.title, story: story.number, waitingFor: waiting });
     else ready.push({ number: t.number, title: t.title, story: story.number });
@@ -51,7 +55,8 @@ function buildStatus(issues, workers = []) {
     blocked,
     inProgress: workers.map(w => ({ number: w.issue, branch: w.branch, startedAt: w.startedAt })),
     incompleteClose,
-    unattached
+    unattached,
+    underClosedStory
   };
 }
 
@@ -71,7 +76,9 @@ function renderStatus(s) {
     table('막힘', ['태스크', '기다리는 이슈'], s.blocked.map(x => [`#${x.number} ${x.title}`, x.waitingFor.map(n => `#${n}`).join(', ')])),
     table('진행 중(워커)', ['이슈', '브랜치', '시작'], s.inProgress.map(x => [`#${x.number}`, x.branch, x.startedAt])),
     table('마감 미완 (자식은 모두 닫혔는데 부모가 열림)', ['이슈', '종류', '자식 수'], s.incompleteClose.map(x => [`#${x.number} ${x.title}`, x.type, x.children]))
-  ].join('\n') + (s.unattached.length ? `\n스토리에 속하지 않은 태스크: ${s.unattached.map(n => `#${n}`).join(', ')}\n` : '');
+  ].join('\n')
+    + (s.unattached.length ? `\n스토리에 속하지 않은 열린 태스크: ${s.unattached.map(n => `#${n}`).join(', ')}\n` : '')
+    + (s.underClosedStory.length ? `\n닫힌 스토리 아래의 열린 태스크: ${s.underClosedStory.map(n => `#${n}`).join(', ')}\n` : '');
 }
 
 module.exports = { buildStatus, renderStatus };

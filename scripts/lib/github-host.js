@@ -46,6 +46,20 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       return JSON.parse(out).map(i => ({ ...i, state: String(i.state).toLowerCase() }));
     },
 
+    // Every open issue, labelled or not: the backlog is mostly issues nobody labelled.
+    listBacklog() {
+      const out = gh([
+        'issue', 'list', ...scope, '--state', 'open', '--limit', '1000', '--json', 'number,title,body,state,labels,assignees'
+      ]);
+      return JSON.parse(out).map(i => ({ ...i, state: String(i.state).toLowerCase() }));
+    },
+
+    // One issue by number (not through the list, which lags right after creation).
+    getIssue(number) {
+      const i = JSON.parse(gh(['issue', 'view', String(number), ...scope, '--json', 'number,title,body,state,labels,assignees']));
+      return { ...i, state: String(i.state).toLowerCase() };
+    },
+
     listMergedPrs(base) {
       const out = gh([
         'pr', 'list', ...scope, '--state', 'merged', '--base', base,
@@ -111,11 +125,12 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
       withBodyFile(body, file => gh(['issue', 'comment', String(number), ...scope, '--body-file', file]));
     },
 
-    closeIssue(number, comment) {
+    // Work that merged is "completed"; triage closes (duplicate, obsolete) are "not planned".
+    closeIssue(number, comment, stateReason = 'completed') {
       withBodyFile(comment, file => {
         gh(['issue', 'comment', String(number), ...scope, '--body-file', file]);
       });
-      gh(['issue', 'close', String(number), ...scope, '--reason', 'completed']);
+      gh(['issue', 'close', String(number), ...scope, '--reason', stateReason]);
     }
   };
 }
