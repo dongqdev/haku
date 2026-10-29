@@ -28,6 +28,12 @@ Then in the repository you want to work on:
 4. Merging needs the user's approval per PR (the screen lists the issues that will close). Automatic merging exists only as an explicit per-story opt-in for verified T1/T2 work.
 5. After the merge: verification on the default branch, `reconcile` closes merged-but-open tasks and rolls up milestones and stories, then the worker is deleted - only if its summary and passing verification are recorded.
 
+## Releases
+
+Claude Code keeps an installed plugin in a cache keyed by its **version**, so a merged change that keeps the version never reaches an installed copy (`plugin update` answers "already at the latest version"). Every PR that changes `skills/`, `agents/`, `scripts/` or `.claude-plugin/` must therefore raise the version in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`; CI (`scripts/check-version.js`) enforces this. Use a patch bump for fixes, a minor bump for new behavior, and a minor bump with a note for renames while the version is below 1.0.
+
+To pick up a release in a running session: `/plugin marketplace update ecc-harness`, then `/plugin update ecc-harness@ecc-harness`, then `/reload-plugins`.
+
 ## Pull request bodies
 
 Every task PR is written in Korean with the same sections: 요약 (what), 이유 (why), 변경 내용 (changes), 테스트 (commands run, results, what was confirmed in a real environment and what was not), 위험과 영향 (compatibility, rollback, follow-ups), and the `Closes #N` line. `issues.js pr-body --issue N` prints the skeleton and `issues.js pr-check` rejects missing or empty sections, sections without Korean prose (code and quotes do not count), and closing lines that do not match the task, including `owner/repo#N` and URL forms. Each section needs at least 5 Korean characters of prose, so a section that only lists file names in code must add a sentence. `build` runs the check before asking for merge approval.
