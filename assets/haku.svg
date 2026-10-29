@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="haku, a chihuahua">
+  <rect width="512" height="512" rx="96" fill="#FFF3E0"/>
+  <!-- ears -->
+  <path d="M96 60 L206 190 L84 250 Z" fill="#C98B4B"/>
+  <path d="M416 60 L306 190 L428 250 Z" fill="#C98B4B"/>
+  <path d="M116 112 L184 190 L108 226 Z" fill="#F4B6A6"/>
+  <path d="M396 112 L328 190 L404 226 Z" fill="#F4B6A6"/>
+  <!-- head -->
+  <ellipse cx="256" cy="290" rx="172" ry="158" fill="#E0A862"/>
+  <!-- muzzle -->
+  <ellipse cx="256" cy="352" rx="92" ry="70" fill="#F6DDB5"/>
+  <!-- eyes -->
+  <ellipse cx="190" cy="280" rx="30" ry="36" fill="#2B1B12"/>
+  <ellipse cx="322" cy="280" rx="30" ry="36" fill="#2B1B12"/>
+  <circle cx="200" cy="266" r="11" fill="#FFFFFF"/>
+  <circle cx="332" cy="266" r="11" fill="#FFFFFF"/>
+  <circle cx="182" cy="294" r="5" fill="#FFFFFF"/>
+  <circle cx="314" cy="294" r="5" fill="#FFFFFF"/>
+  <!-- nose and mouth -->
+  <path d="M232 326 Q256 312 280 326 Q276 352 256 356 Q236 352 232 326 Z" fill="#2B1B12"/>
+  <path d="M256 356 L256 378 M256 378 Q238 396 220 384 M256 378 Q274 396 292 384" stroke="#2B1B12" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <!-- tongue -->
+  <path d="M242 390 Q256 440 270 390 Z" fill="#F07F8E"/>
+  <!-- collar -->
+  <path d="M120 430 Q256 490 392 430 L400 470 Q256 530 112 470 Z" fill="#3E7CB1"/>
+  <circle cx="256" cy="486" r="18" fill="#F2C94C"/>
+</svg>

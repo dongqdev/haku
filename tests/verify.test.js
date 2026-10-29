@@ -30,7 +30,7 @@ function makeRepo(profileOverrides = {}) {
     minTests: 1,
     ...profileOverrides
   };
-  write(repo, '.ecc-harness/verify.json', JSON.stringify({ profiles: { unit: profile } }));
+  write(repo, '.haku/verify.json', JSON.stringify({ profiles: { unit: profile } }));
   write(repo, 'run-tests.js', "console.log('tests 3'); process.exit(0);");
   write(repo, 'tests/a.test.js', 'one\ntwo\nthree\n');
   sh(repo, 'add', '-A');
@@ -96,7 +96,7 @@ test('a test file that shrinks asks for review instead of passing', () => {
 test('the command comes from the base branch, not the worker branch', () => {
   const repo = makeRepo();
   // The worker rewrites the config so its "tests" are `true`; it must be ignored.
-  write(repo, '.ecc-harness/verify.json', JSON.stringify({ profiles: { unit: { cmd: ['node', '-e', ''] } } }));
+  write(repo, '.haku/verify.json', JSON.stringify({ profiles: { unit: { cmd: ['node', '-e', ''] } } }));
   write(repo, 'run-tests.js', "console.log('tests 0'); process.exit(0);");
   commit(repo);
   const r = run(repo);
@@ -119,7 +119,7 @@ test('a real `npm test` profile runs and its test count is read (covers the Wind
   sh(repo, 'init', '-q', '-b', 'main');
   write(repo, 'package.json', JSON.stringify({ name: 'p', version: '0.0.0', scripts: { test: 'node --test tests/a.test.js' } }));
   write(repo, 'tests/a.test.js', "const t = require('node:test'); t('one', () => {}); t('two', () => {});\n");
-  write(repo, '.ecc-harness/verify.json', JSON.stringify({
+  write(repo, '.haku/verify.json', JSON.stringify({
     profiles: { unit: { cmd: ['npm', 'test'], countPattern: 'tests (\\d+)', minTests: 2 } }
   }));
   sh(repo, 'add', '-A');

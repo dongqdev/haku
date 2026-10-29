@@ -22,7 +22,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
   }
 
   function withBodyFile(body, fn) {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ecc-harness-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'haku-'));
     const file = path.join(dir, 'body.md');
     fs.writeFileSync(file, body, 'utf8');
     try {
@@ -92,7 +92,7 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync } = {
             gh(['issue', 'edit', String(number), ...scope, '--add-label', label]);
           }
         } catch (err) {
-          process.stderr.write(`[ecc-harness] warning: issue #${number} created, but the owner could not be recorded: ${String(err.message).split('\n')[0]}\n`);
+          process.stderr.write(`[haku] warning: issue #${number} created, but the owner could not be recorded: ${String(err.message).split('\n')[0]}\n`);
         }
       }
       return number;

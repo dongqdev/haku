@@ -23,7 +23,7 @@ const issue = (number, type, state = 'open', body = '') => ({
   state,
   body,
   title: `${type} ${number}`,
-  labels: [{ name: 'ecc-harness' }, { name: `type:${type}` }]
+  labels: [{ name: 'haku' }, { name: `type:${type}` }]
 });
 
 test('merged PR (branch convention) closes its open task; dry-run closes nothing', () => {

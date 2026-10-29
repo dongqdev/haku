@@ -82,7 +82,7 @@ function reconcile(host, { apply = false } = {}) {
   const applied = [];
   if (apply) {
     for (const item of plan) {
-      host.closeIssue(item.issue, `Closed by ecc-harness reconcile: ${item.reason}.`);
+      host.closeIssue(item.issue, `Closed by haku reconcile: ${item.reason}.`);
       applied.push(item.issue);
     }
   }

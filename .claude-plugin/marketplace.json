@@ -1,13 +1,13 @@
 {
-  "name": "ecc-harness",
+  "name": "haku",
   "owner": { "name": "dongqdev" },
   "metadata": { "description": "Personal cross-platform harness: Git-issue driven stories, orchestrator/worker development, merge-to-close reconciliation" },
   "plugins": [
     {
-      "name": "ecc-harness",
+      "name": "haku",
       "source": "./",
       "description": "Git-issue driven planning, orchestrator/worker development and verified merge-to-close for Claude Code (GitHub first)",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "category": "workflow"
     }
   ]

@@ -11,7 +11,7 @@ const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { slugify, SUMMARY_MARKER, verifiedMarker } = require('./lib/model');
 const { skeleton, checkBody } = require('./lib/pr-body');
 
-const HELP = `ecc-harness issues
+const HELP = `haku issues
 
 Usage:
   issues.js publish <draft.json> [--apply] [--orchestrator <id>] [--repo <owner/repo>]
@@ -175,7 +175,7 @@ if (require.main === module) {
   try {
     process.exit(main(process.argv.slice(2)));
   } catch (err) {
-    console.error(`[ecc-harness] ${err.message}`);
+    console.error(`[haku] ${err.message}`);
     process.exit(1);
   }
 }

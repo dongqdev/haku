@@ -14,15 +14,15 @@ function git(cwd, args) {
   return r.stdout.trim();
 }
 
-// Worktrees live under a short root (default ~/.eh/w) so Windows' 260-char path limit
-// is not hit by deep repo paths; override with ECC_HARNESS_HOME.
+// Worktrees live under a short root (default ~/.haku/w) so Windows' 260-char path limit
+// is not hit by deep repo paths; override with HAKU_HOME.
 function workerRoot(home) {
-  return path.join(home || process.env.ECC_HARNESS_HOME || path.join(os.homedir(), '.eh'), 'w');
+  return path.join(home || process.env.HAKU_HOME || path.join(os.homedir(), '.haku'), 'w');
 }
 
 function recordDir(cwd) {
   const common = path.resolve(cwd, git(cwd, ['rev-parse', '--git-common-dir']));
-  return path.join(common, 'ecc-harness');
+  return path.join(common, 'haku');
 }
 
 function listWorkers(cwd) {
@@ -37,7 +37,7 @@ function listWorkers(cwd) {
 // With a host, the issue must exist, be open and be a task: workers never own stories or milestones.
 function assertTaskIssue(host, issue) {
   const found = host.listIssues().find(i => i.number === issue);
-  if (!found) throw new Error(`issue #${issue} not found among ecc-harness issues`);
+  if (!found) throw new Error(`issue #${issue} not found among haku issues`);
   if (issueType(found) !== 'task') throw new Error(`issue #${issue} is not a task (type: ${issueType(found) || 'none'})`);
   if (found.state !== 'open') throw new Error(`issue #${issue} is not open`);
 }

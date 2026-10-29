@@ -1,7 +1,8 @@
 {
-  "name": "ecc-harness",
-  "version": "0.2.2",
-  "description": "Personal cross-platform harness on ECC: Git-issue driven story planning, orchestrator/worker development, and merge-to-close reconciliation (GitHub first, GitLab next).",
+  "name": "haku",
+  "version": "0.3.0",
+  "description": "HAKU - Harness Assistant Keeping Users in the loop. Git-issue driven story planning, orchestrator/worker development and verified merge-to-close for Claude Code (GitHub first, GitLab next).",
+  "author": { "name": "dongqdev" },
   "license": "MIT",
   "keywords": ["harness", "orchestrator", "worker", "issues", "github", "gitlab"],
   "skills": ["./skills/"]
