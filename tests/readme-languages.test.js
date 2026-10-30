@@ -23,7 +23,7 @@ test('README.md is Korean and README.en.md is English, and each links to the oth
 
 test('both READMEs have the same sections in the same order', () => {
   assert.deepStrictEqual(headings(ko), headings(en), 'the number and the levels of the headings must match');
-  assert.ok(headings(en).length >= 15);
+  assert.strictEqual(headings(en).length, 4, 'Install, Usage, Flow, More: the minor topics are collapsible blocks, not headings');
 });
 
 test('both READMEs carry the same commands and files: every code block and every inline command matches', () => {

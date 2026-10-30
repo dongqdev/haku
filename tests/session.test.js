@@ -462,7 +462,7 @@ test('the skill, the worker rules and the README describe the two worker modes a
   assert.match(read('agents/worker.md'), /Your full issue text is in `\.haku-issue\.md` in your worktree\. git ignores it; never commit it/);
   assert.match(read('agents/worker.md'), /Never edit `\.haku\/`, `\.claude\/`, workflow files/);
   const readme = read('README.en.md');
-  assert.match(readme, /## Workers/);
+  assert.match(readme, /<summary>Workers<\/summary>/);
   assert.match(readme, /"workerMode": "session"/);
   assert.match(readme, /HAKU_CLAUDE_BIN/);
   assert.match(readme, /cannot be set here, because a pull request could change this file/);
