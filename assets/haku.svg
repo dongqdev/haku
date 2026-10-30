@@ -1,27 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="haku, a chihuahua">
-  <rect width="512" height="512" rx="96" fill="#FFF3E0"/>
-  <!-- ears -->
-  <path d="M96 60 L206 190 L84 250 Z" fill="#C98B4B"/>
-  <path d="M416 60 L306 190 L428 250 Z" fill="#C98B4B"/>
-  <path d="M116 112 L184 190 L108 226 Z" fill="#F4B6A6"/>
-  <path d="M396 112 L328 190 L404 226 Z" fill="#F4B6A6"/>
-  <!-- head -->
-  <ellipse cx="256" cy="290" rx="172" ry="158" fill="#E0A862"/>
-  <!-- muzzle -->
-  <ellipse cx="256" cy="352" rx="92" ry="70" fill="#F6DDB5"/>
-  <!-- eyes -->
-  <ellipse cx="190" cy="280" rx="30" ry="36" fill="#2B1B12"/>
-  <ellipse cx="322" cy="280" rx="30" ry="36" fill="#2B1B12"/>
-  <circle cx="200" cy="266" r="11" fill="#FFFFFF"/>
-  <circle cx="332" cy="266" r="11" fill="#FFFFFF"/>
-  <circle cx="182" cy="294" r="5" fill="#FFFFFF"/>
-  <circle cx="314" cy="294" r="5" fill="#FFFFFF"/>
-  <!-- nose and mouth -->
-  <path d="M232 326 Q256 312 280 326 Q276 352 256 356 Q236 352 232 326 Z" fill="#2B1B12"/>
-  <path d="M256 356 L256 378 M256 378 Q238 396 220 384 M256 378 Q274 396 292 384" stroke="#2B1B12" stroke-width="7" fill="none" stroke-linecap="round"/>
-  <!-- tongue -->
-  <path d="M242 390 Q256 440 270 390 Z" fill="#F07F8E"/>
-  <!-- collar -->
-  <path d="M120 430 Q256 490 392 430 L400 470 Q256 530 112 470 Z" fill="#3E7CB1"/>
-  <circle cx="256" cy="486" r="18" fill="#F2C94C"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256"><title>haku</title><rect width="256" height="256" rx="57.6" fill="#F4ECE1"/><g transform="translate(26.37 26.37) scale(0.794)" fill="#4A2E20">
+  
+  <path d="M31 28 L112 88 L59 133 Q35 96 31 28 Z M225 28 L144 88 L197 133 Q221 96 225 28 Z" fill="#4A2E20"/>
+  <path fill-rule="evenodd" fill="#4A2E20" d="M128 76 C85 76 43 106 43 152 C43 198 80 228 128 228 C176 228 213 198 213 152 C213 106 171 76 128 76 Z
+    M128 80 Q141 105 145 133 Q148 149 158 160 Q173 174 171 193 Q168 219 128 225 Q88 219 85 193 Q83 174 98 160 Q108 149 111 133 Q115 105 128 80 Z
+    M60 152 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0 Z
+    M168 152 a14 14 0 1 0 28 0 a14 14 0 1 0 -28 0 Z
+    M113 178 Q128 168 143 178 Q141 192 128 194 Q115 192 113 178 Z"/>
+</g></svg>

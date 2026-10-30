@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="haku, a chihuahua (small)">
+  <title>haku, a chihuahua (small)</title>
+  <path d="M24 24 L114 90 L56 140 Q28 100 24 24 Z M232 24 L142 90 L200 140 Q228 100 232 24 Z" fill="#000"/>
+  <path fill-rule="evenodd" fill="#000" d="M128 76 C85 76 41 106 41 154 C41 202 80 232 128 232 C176 232 215 202 215 154 C215 106 171 76 128 76 Z
+    M128 84 Q150 112 154 140 Q157 158 168 170 Q180 184 178 202 Q172 226 128 228 Q84 226 78 202 Q76 184 88 170 Q99 158 102 140 Q106 112 128 84 Z
+    M54 156 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z
+    M168 156 a17 17 0 1 0 34 0 a17 17 0 1 0 -34 0 Z"/>
+</svg>
