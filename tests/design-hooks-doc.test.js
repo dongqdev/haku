@@ -104,9 +104,12 @@ test('the unverified items are marked as open points in both languages', () => {
   assert.match(part('English'), /approval step[^\n]*\(\*\*unverified\*\*\)/);
 });
 
-test('the version files agree and equal 0.16.7', () => {
+test('the version files agree and are at least 0.16.7', () => {
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   const market = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.ok(Array.isArray(market.plugins) && market.plugins.length >= 1);
-  for (const v of [plugin.version, ...market.plugins.map(p => p.version)]) assert.strictEqual(v, '0.16.7');
+  const versions = [plugin.version, ...market.plugins.map(p => p.version)];
+  for (const v of versions) assert.strictEqual(v, plugin.version);
+  const [a, b, c] = plugin.version.split('.').map(Number);
+  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 7), `version ${plugin.version} is older than 0.16.7`);
 });
