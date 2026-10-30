@@ -74,7 +74,7 @@ test('listIssues reads every page, drops pull requests only after all pages are 
   assert.strictEqual(calls.filter(c => c[0] === 'api').length, 6, 'three pages per read, and the list is read twice to confirm it is stable');
   assert.match(calls[0][1], /labels=haku/);
   assert.match(calls[0][1], /state=all/);
-  assert.deepStrictEqual(issues[0], { number: 1, title: 't1', body: 'b1', state: 'open', labels: [{ name: 'haku' }], assignees: [{ login: 'a' }] });
+  assert.deepStrictEqual(issues[0], { number: 1, title: 't1', body: 'b1', state: 'open', closedAt: null, stateReason: null, labels: [{ name: 'haku' }], assignees: [{ login: 'a' }] });
 });
 
 test('listBacklog reads every page of open issues of any label', () => {

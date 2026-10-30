@@ -68,6 +68,8 @@ function createGitHubHost({ repo = null, ghBin = 'gh', exec = execFileSync, perP
     title: i.title,
     body: i.body || '',
     state: String(i.state).toLowerCase(),
+    closedAt: i.closed_at || null,
+    stateReason: i.state_reason ? String(i.state_reason).toLowerCase() : null,
     labels: (i.labels || []).map(l => ({ name: typeof l === 'string' ? l : l.name })),
     assignees: (i.assignees || []).map(a => ({ login: a.login }))
   });

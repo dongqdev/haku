@@ -71,9 +71,11 @@ const table = (title, header, rows) => {
 // Closed stories still waiting for a retro. Nothing for zero; a failed read says so instead of claiming zero.
 function renderRetro(retro) {
   if (!retro) return '';
-  if (retro.error) return '\nretro 대기: 확인하지 못함\n';
-  if (!retro.due.length) return '';
-  return `\nretro 대기 ${retro.due.length}개: ${retro.due.map(n => `#${n}`).join(', ')}\n`;
+  if (retro.error) return `\nretro 대기: 확인하지 못함 (${retro.error})\n`;
+  const unreadable = retro.unreadable || [];
+  const waiting = retro.due.length ? `retro 대기 ${retro.due.length}개: ${retro.due.map(n => `#${n}`).join(', ')}\n` : '';
+  const unknown = unreadable.length ? `확인하지 못함 ${unreadable.map(u => `#${u.number} (${u.error})`).join(', ')}\n` : '';
+  return waiting || unknown ? `\n${waiting}${unknown}` : '';
 }
 
 // All five sections are always printed, so an empty section reads as "none", not "cut off".
