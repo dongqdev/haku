@@ -38,15 +38,19 @@ function failures(scripts) {
   r = run(scripts, ['list'], { data });
   expect('list shows it', r.status === 0 && r.stdout.includes('use the plain word'));
 
-  expect('300 chars ok', add('a '.repeat(150).trim().padEnd(300, 'b')).status === 0);
-  r = add('x'.repeat(10) + ' ' + 'y '.repeat(145) + 'zzzzzz');
-  expect('301 chars rejected', r.status !== 0 && !fs.readFileSync(file(data), 'utf8').includes('zzzzzz'));
+  const exact = n => 'ab cd '.repeat(60).slice(0, n - 1) + 'z';
+  expect('exactly 300 ok', exact(300).length === 300 && add(exact(300)).status === 0);
+  r = add(exact(301));
+  expect('301 rejected', exact(301).length === 301 && r.status !== 0 && /longer/.test(r.stderr));
   const count = fs.readFileSync(file(data), 'utf8').trim().split('\n').length;
   expect('two entries kept', count === 2);
 
   const secrets = ['ghp_', 'sk-', 'AKIA', 'Bearer '].map((p, i) => [
     p + ['abcdefghijklmnopqrstuvwx', 'abcdefghijklmnopqrstuvwx', 'ABCDEFGHIJKLMNOP', 'abcdefghijklmnop1234'][i]]);
-  secrets.push(['password' + '=' + 'hunter22xx'], ['0123456789abcdef'.repeat(3)]);
+  secrets.push(['password' + '=' + 'hunter22xx'], ['0123456789abcdef'.repeat(3)],
+    ['DB_PASS' + 'WORD=' + 'hunter22xx'], ['MY_API_' + 'KEY: ' + 'hunter22xx'],
+    ['https' + '://bob:' + 'hunter22xx' + '@host.example'], ['glp' + 'at-' + 'abcdefghijklmnopqrstu'],
+    ['pass' + 'word is ' + 'hunter22xx'], ['pass' + 'wd: ' + 'hunter22xx'], ['비밀' + '번호는 ' + 'hunter22xx']);
   for (const [s] of secrets) {
     r = add(`please never do this ${s} again`);
     expect(`secret rejected: ${s.slice(0, 4)}`, r.status !== 0 && !(r.stdout + r.stderr).includes(s) && !fs.readFileSync(file(data), 'utf8').includes(s));
@@ -55,6 +59,8 @@ function failures(scripts) {
   const personal = '/ho' + 'me/' + 'someperson' + '/proj';
   r = add(`it edited ${personal} by mistake`);
   expect('personal path rejected', r.status !== 0 && /personal path/.test(r.stderr) && !(r.stdout + r.stderr).includes('someperson'));
+  r = add(`it edited ${personal} haku:allow-personal-path by mistake`);
+  expect('allow mark does not bypass', r.status !== 0 && /personal path/.test(r.stderr));
   expect('personal path not stored', !fs.readFileSync(file(data), 'utf8').includes('someperson'));
   expect('still two entries', fs.readFileSync(file(data), 'utf8').trim().split('\n').length === 2);
 
@@ -76,11 +82,36 @@ function failures(scripts) {
   const inside = path.join(repo, 'data');
   r = add('fine sentence', { data: inside, cwd: repo });
   expect('inside repo refused', r.status !== 0 && !fs.existsSync(inside));
-  const link = path.join(tmp(), 'link');
-  fs.symlinkSync(repo, link);
-  r = add('fine sentence', { data: path.join(link, 'viaLink'), cwd: repo });
-  expect('symlink into repo refused', r.status !== 0 && !fs.existsSync(path.join(repo, 'viaLink')));
+  try {
+    const g2 = tmp();
+    spawnSync('git', ['init', '-q'], { cwd: g2 });
+    const link = path.join(tmp(), 'link');
+    fs.symlinkSync(g2, link);
+    r = add('fine sentence', { data: path.join(link, 'viaLink'), cwd: g2 });
+    expect('symlink into repo refused', r.status !== 0 && !fs.existsSync(path.join(g2, 'viaLink')));
+  } catch (err) {
+    if (err.code !== 'EPERM') throw err; // no symlink right on this system: skipped
+  }
   expect('repo stays empty', fs.readdirSync(repo).join() === '.haku');
+
+  // a data folder inside some other git work tree is refused even when cwd is elsewhere
+  if (spawnSync('git', ['--version']).status === 0) {
+    const g = tmp();
+    spawnSync('git', ['init', '-q'], { cwd: g });
+    r = add('fine sentence', { data: path.join(g, 'sub', 'd'), cwd: os.tmpdir() });
+    expect('data folder in a git work tree refused', r.status !== 0 && !fs.existsSync(path.join(g, 'sub')));
+  }
+
+  // ~/.haku/config.json is the user config, not a repository marker
+  const home2 = tmp();
+  fs.mkdirSync(path.join(home2, '.haku'));
+  fs.writeFileSync(path.join(home2, '.haku', 'config.json'), '{}');
+  r = run(scripts, ['add', '--text', 'with user config'], { home: home2, cwd: home2 });
+  expect('default under a home with config.json', r.status === 0 && fs.existsSync(path.join(home2, '.haku', 'corrections.jsonl')));
+  const underHome = path.join(home2, 'plugin-data');
+  r = run(scripts, ['add', '--text', 'data under home'], { home: home2, data: underHome, cwd: home2 });
+  expect('CLAUDE_PLUGIN_DATA under home', r.status === 0 && fs.existsSync(path.join(underHome, 'corrections.jsonl')));
+  expect('no temp file left', fs.existsSync(underHome) && fs.readdirSync(underHome).join() === 'corrections.jsonl');
 
   // default location under HOME
   const home = tmp();
@@ -110,17 +141,29 @@ test('mutation: skipping the secret check is caught', () => {
   assert.ok(failures(mutant(C, 'for (const [re, what] of SECRETS) if (re.test(text))', 'for (const [re, what] of []) if (re.test(text))')).length > 0);
 });
 test('mutation: skipping the personal path check is caught', () => {
-  assert.ok(failures(mutant(C, 'if (findInLine(text).length)', 'if (false)')).length > 0);
+  assert.ok(failures(mutant(C, "if (findInLine(text.split(ALLOW_MARK).join('')).length)", 'if (false)')).length > 0);
 });
 test('mutation: never pruning old lines is caught', () => {
   assert.ok(failures(mutant(C, 'now - t <= MAX_AGE_MS', 'true')).length > 0);
 });
 test('mutation: writing inside the repository is caught', () => {
-  assert.ok(failures(mutant(C, 'if (repoRoots(cwd).some(root => insideRoot(root, dir)))', 'if (false)')).length > 0);
+  assert.ok(failures(mutant(C, 'if (!insideRoot(root, dir)) continue;', 'continue;')).length > 0);
 });
 test('mutation: not resolving symlinks is caught', () => {
   assert.ok(failures(mutant(C, 'try { return path.join(fs.realpathSync(cur), ...tail); }', 'try { throw new Error("x"); }')).length > 0);
 });
 test('mutation: clear that keeps the file is caught', () => {
   assert.ok(failures(mutant(C, "fs.rmSync(file, { force: true });", '')).length > 0);
+});
+test('mutation: ignoring that home is not a repository is caught', () => {
+  assert.ok(failures(mutant(C, 'if (haku && !same(haku, os.homedir()))', 'if (haku)')).length > 0);
+});
+test('mutation: not checking the data folder own work tree is caught', () => {
+  assert.ok(failures(mutant(C, 'roots.push(...repoRoots(near));', '')).length > 0);
+});
+test('mutation: letting the allow mark bypass is caught', () => {
+  assert.ok(failures(mutant(C, "findInLine(text.split(ALLOW_MARK).join(''))", 'findInLine(text)')).length > 0);
+});
+test('mutation: dropping the spoken password rule is caught', () => {
+  assert.ok(failures(mutant(C, '(?:is|', '(?:zzzz|')).length > 0);
 });

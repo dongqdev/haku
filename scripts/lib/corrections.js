@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { findInLine } = require('./personal-paths');
+const { findInLine, ALLOW_MARK } = require('./personal-paths');
 const { findHakuRoot, normalizePath, relativeTo } = require('./hook-common');
 
 // Correction sentences: one short sentence the user said to correct the agent, saved by hand (`corrections add`) so a
@@ -24,7 +24,11 @@ const SECRETS = [
   [/\bxox[baprs]-[A-Za-z0-9-]{10,}/, 'a Slack token'],
   [/\bBearer[ \t]+[A-Za-z0-9._~+\/=-]{16,}/i, 'a bearer token'],
   [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, 'a JSON web token'],
-  [/\b(?:password|passwd|pwd|secret|token|api[_-]?key)\b[ \t]*[:=][ \t]*["']?[^\s"']{6,}/i, 'a password, token or key assignment'],
+  [/\bglpat-[A-Za-z0-9_-]{20,}/, 'a GitLab token'],
+  [/\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@]+:[^\s\/@]+@/i, 'a URL with credentials'],
+  // DB_PASSWORD=..., MY_API_KEY: ... (an underscore before the name counts as a boundary)
+  [/(?:^|[^A-Za-z0-9])(?:password|passwd|pwd|secret|token|api[_-]?key)[ \t]*[:=][ \t]*["']?[^\s"']{6,}/i, 'a password, token or key assignment'],
+  [/(?:password|passwd|비밀번호)[\s\S]{0,6}?(?:is|는|은|:)[ \t]*\S{6,}/i, 'a spoken password'],
   [/\b[0-9a-fA-F]{32,}\b/, 'a long hex string'],
   [/[A-Za-z0-9+\/_-]{32,}={0,2}/, 'a long base64-like string']
 ];
@@ -34,7 +38,7 @@ function rejectReason(text) {
   if (typeof text !== 'string' || !text.trim()) return 'it is empty';
   if ([...text].length > MAX_CHARS) return `it is longer than ${MAX_CHARS} characters`;
   for (const [re, what] of SECRETS) if (re.test(text)) return `it looks like ${what}`;
-  if (findInLine(text).length) return 'it names a personal path';
+  if (findInLine(text.split(ALLOW_MARK).join('')).length) return 'it names a personal path';
   return null;
 }
 
@@ -55,10 +59,12 @@ function realish(p) {
   }
 }
 
+// A repository root the data folder must stay out of. The home folder is not one: ~/.haku/config.json is the user's
+// own config file, not a marker of a haku repository, and a dotfiles repository at home may hold the default folder.
 function repoRoots(cwd) {
   const roots = [];
   const haku = findHakuRoot(cwd);
-  if (haku) roots.push(haku);
+  if (haku && !same(haku, os.homedir())) roots.push(haku);
   const git = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' });
   if (git.status === 0 && git.stdout.trim()) roots.push(git.stdout.trim());
   return roots;
@@ -70,10 +76,23 @@ function insideRoot(root, dir) {
   return d.toLowerCase() === r.toLowerCase() || relativeTo(r, d) !== null;
 }
 
-// The folder to write into; throws when it lies inside the current repository (a record must not reach a commit).
+const same = (a, b) => normalizePath(realish(a)).toLowerCase() === normalizePath(realish(b)).toLowerCase();
+
+// The folder to write into; throws when it lies inside a repository (a record must not reach a commit): the current
+// one (found from cwd) or any git work tree around the folder itself. The default ~/.haku is allowed when the only
+// repository around it is the home folder.
 function safeDir(cwd, env) {
   const dir = dataDir(env);
-  if (repoRoots(cwd).some(root => insideRoot(root, dir))) {
+  const home = os.homedir();
+  const isDefault = same(dir, path.join(home, '.haku'));
+  const roots = repoRoots(cwd);
+  // the nearest existing folder of the data folder: its own git work tree counts too
+  let near = realish(dir);
+  while (!fs.existsSync(near) && path.dirname(near) !== near) near = path.dirname(near);
+  roots.push(...repoRoots(near));
+  for (const root of roots) {
+    if (!insideRoot(root, dir)) continue;
+    if (same(root, home) && isDefault) continue;
     throw new Error('the corrections folder lies inside a repository; set CLAUDE_PLUGIN_DATA to a folder outside it');
   }
   return dir;
@@ -104,7 +123,11 @@ function addCorrection(text, { cwd = process.cwd(), env = process.env, now = Dat
   const file = path.join(dir, FILE);
   const entries = readEntries(file, now);
   entries.push({ time: new Date(now).toISOString(), text });
-  fs.writeFileSync(file, entries.map(e => JSON.stringify(e)).join('\n') + '\n', { mode: 0o600 });
+  // Written aside and renamed over the file, so a crash never leaves a half-written file. Two writers at the same
+  // moment may lose one entry (no lock; accepted).
+  const aside = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(aside, entries.map(e => JSON.stringify(e)).join('\n') + '\n', { mode: 0o600 });
+  fs.renameSync(aside, file);
   return { saved: true };
 }
 
