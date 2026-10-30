@@ -11,14 +11,16 @@ const text = fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8') : '';
 const LANGS = {
   ko: {
     title: '한국어',
-    sections: ['전제와 현재 상태', '훅의 종류와 목적', '훅을 어디에 둘 것인가', '교정 자동 감지의 개인정보 규칙', '만드는 법과 시험', '위험: 훅이 구멍이 되는 경우', '단계별 도입 순서', '사용자가 고를 결정 목록'],
+    glance: '한눈에 보기',
+    sections: ['한눈에 보기', '전제와 현재 상태', '훅의 종류와 목적', '훅을 어디에 둘 것인가', '교정 자동 감지의 개인정보 규칙', '만드는 법과 시험', '위험: 훅이 구멍이 되는 경우', '단계별 도입 순서', '사용자가 고를 결정 목록'],
     rec: /^- 권장:\s*\S/m, kinds: ['작업 파일 범위 검사', '푸시 차단', '검사 약화 감지', '세션 종료 교정 수집'],
     fail: ['fail open', 'fail closed', '미확인'],
     question: /^- 질문:/m, options: /^- 선택지: .*\(a\).*\(b\)/m,
   },
   en: {
     title: 'English',
-    sections: ['Premises and current state', 'Hook kinds and purposes', 'Where hooks should live', 'Privacy rules for correction capture', 'How to build and test', 'Risks: when a hook becomes a hole', 'Staged rollout order', 'Decision list for the user'],
+    glance: 'At a glance',
+    sections: ['At a glance', 'Premises and current state', 'Hook kinds and purposes', 'Where hooks should live', 'Privacy rules for correction capture', 'How to build and test', 'Risks: when a hook becomes a hole', 'Staged rollout order', 'Decision list for the user'],
     rec: /^- Recommendation:\s*\S/m, kinds: ['Task file-scope check', 'Push block', 'Weakened-check detection', 'Session-end correction capture'],
     fail: ['fail open', 'fail closed', 'unverified'],
     question: /^- Question:/m, options: /^- Options: .*\(a\).*\(b\)/m,
@@ -34,7 +36,7 @@ function part(title) {
   return next ? rest.slice(0, next.index) : rest;
 }
 const headings = s => s.split('\n').filter(l => /^#{3,6}\s/.test(l)).map(l => l.match(/^#+/)[0]);
-const level3 = s => s.split('\n').filter(l => /^### /.test(l)).map(l => l.replace(/^### \d+\.\s*/, '').trim());
+const level3 = s => s.split('\n').filter(l => /^### /.test(l)).map(l => l.replace(/^### (\d+\.\s*)?/, '').trim());
 
 test('the design document exists and has exactly the two language parts', () => {
   assert.ok(text.length > 0, 'docs/design/hooks-and-capture.md is missing');
@@ -75,23 +77,52 @@ test('the build section covers zero-dependency Node, stdin JSON and the three op
   for (const k of ['ko', 'en']) for (const w of need[k]) assert.match(part(LANGS[k].title), new RegExp(w), `${k}: ${w}`);
 });
 
-test('the decision list is last, numbered the same in both parts, and every item has options and a recommendation', () => {
+test('the first section is the at-a-glance section in both parts, in plain words with examples', () => {
+  const need = {
+    ko: ['훅이 무엇인가요', '웹훅', '.husky', '정정 문장이란', 'fail open과 fail closed란', 'stop_hook_active', '플러그인 훅을 처음 켤 때', '끄는 정확한 명령', 'ECC', 'src/hooks/hooks.json', '약 25개', '구현 세부'],
+    en: ['What is a hook', 'webhook', '.husky', 'What is a correction sentence', 'What are fail open and fail closed', 'stop_hook_active', 'user is asked once', 'exact command to turn a plugin', 'ECC', 'src/hooks/hooks.json', 'about 25', 'implementation details'],
+  };
+  for (const [k, L] of Object.entries(LANGS)) {
+    const p = part(L.title);
+    const first = p.split(/^### /m)[1];
+    assert.ok(first.startsWith(L.glance), k + ': the first numbered-or-not section is ' + L.glance);
+    for (const w of need[k]) assert.ok(first.includes(w), `${k}: at-a-glance misses "${w}"`);
+    assert.ok(/^\| .*\|$/m.test(first) && first.includes('---'), k + ': a comparison table is in the at-a-glance section');
+    for (const kind of ['A', 'B', 'C', 'D']) assert.match(first, new RegExp(kind + (k === 'ko' ? ', ' : ', ')), k + ': one example for hook ' + kind);
+    assert.match(first, k === 'ko' ? /구현 세부[^\n]*미확인/ : /implementation details[^\n]*unverified/, k + ': ECC and harness details are marked unverified');
+  }
+});
+
+test('the decision list is last, numbered the same in both parts; 1-5 are decided, 6-8 are open with a recommendation', () => {
   const ids = {};
+  const DECIDED = { ko: /^- 상태: \*\*확정된 결정\*\*/m, en: /^- Status: \*\*Decided\*\*/m };
+  const OPEN = { ko: /^- 상태: \*\*열린 결정\*\*/m, en: /^- Status: \*\*Open\*\*/m };
+  const ANSWER = { ko: /^- 확정된 답: \(a\)\s*\S/m, en: /^- Decided answer: \(a\)\s*\S/m };
+  const PLAIN = { ko: [/^- 쉬운 설명: \S/m, /^- 예: \S/m], en: [/^- Plain version: \S/m, /^- Example: \S/m] };
   for (const [k, L] of Object.entries(LANGS)) {
     const p = part(L.title);
     const starts = [...p.matchAll(/^### /gm)];
     const tail = p.slice(starts[starts.length - 1].index);
-    assert.ok(tail.split('\n')[0].includes(L.sections[7]), k + ': the decision list is the last section');
+    assert.ok(tail.split('\n')[0].includes(L.sections[8]), k + ': the decision list is the last section');
     const items = tail.split(/^(?=#### )/m).filter(b => b.startsWith('#### '));
     ids[k] = items.map(b => Number(b.match(/(\d+)\./)[1]));
-    assert.ok(items.length >= 6, k + ': at least six decisions');
-    for (const b of items) {
+    assert.strictEqual(items.length, 8, k + ': eight decisions');
+    items.forEach((b, i) => {
       const name = b.split('\n')[0];
-      assert.match(b, L.rec, k + ': recommendation missing in ' + name);
+      for (const re of PLAIN[k]) assert.match(b, re, k + ': plain line and example in ' + name);
       assert.match(b, L.question, k + ': question line in ' + name);
       assert.match(b, L.options, k + ': options a and b in ' + name);
-      assert.match(b.match(L.options)[0], /^[^\n]*\(a\)[^\n]*\(Recommended\)[^\n]*?\(b\)/, k + ': option (a) is marked Recommended in ' + name);
-    }
+      if (i < 5) {
+        assert.match(b, DECIDED[k], k + ': decided marker in ' + name);
+        assert.doesNotMatch(b, OPEN[k], k + ': not open ' + name);
+        assert.match(b, ANSWER[k], k + ': decided answer in ' + name);
+      } else {
+        assert.match(b, OPEN[k], k + ': open marker in ' + name);
+        assert.doesNotMatch(b, DECIDED[k], k + ': not decided ' + name);
+        assert.match(b, L.rec, k + ': recommendation missing in ' + name);
+        assert.match(b.match(L.options)[0], /^[^\n]*\(a\)[^\n]*\(Recommended\)[^\n]*?\(b\)/, k + ': option (a) is marked Recommended in ' + name);
+      }
+    });
   }
   assert.deepStrictEqual(ids.ko, ids.en);
   assert.deepStrictEqual(ids.ko, ids.ko.map((_, i) => i + 1));
@@ -104,12 +135,12 @@ test('the unverified items are marked as open points in both languages', () => {
   assert.match(part('English'), /approval step[^\n]*\(\*\*unverified\*\*\)/);
 });
 
-test('the version files agree and are at least 0.16.7', () => {
+test('the version files agree and are at least 0.16.9', () => {
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   const market = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.ok(Array.isArray(market.plugins) && market.plugins.length >= 1);
   const versions = [plugin.version, ...market.plugins.map(p => p.version)];
   for (const v of versions) assert.strictEqual(v, plugin.version);
   const [a, b, c] = plugin.version.split('.').map(Number);
-  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 7), `version ${plugin.version} is older than 0.16.7`);
+  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 9), `version ${plugin.version} is older than 0.16.9`);
 });

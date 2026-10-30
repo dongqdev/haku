@@ -2,7 +2,44 @@
 
 ## 한국어
 
-**상태**: 설계 초안입니다. 구현이 아닙니다. 사용자가 이 문서를 승인한 뒤에 구현을 새 계획으로 세웁니다. 출처는 `docs/ideas-from-others.md`의 후보 1(훅 안전망)과 후보 13(교정 자동 감지)입니다. Claude Code 훅의 동작은 2026-10-30에 공식 문서에서 읽은 내용입니다(요약기를 거쳤으므로 원문 확인이 필요합니다). 확인하지 못한 것은 "미확인"으로 적었습니다.
+**상태**: 설계 초안입니다(결정 1~5는 확정, 6~8은 열림). 구현이 아닙니다. 사용자가 이 문서를 승인한 뒤에 구현을 새 계획으로 세웁니다. 출처는 `docs/ideas-from-others.md`의 후보 1(훅 안전망)과 후보 13(교정 자동 감지)입니다. Claude Code 훅의 동작은 2026-10-30에 공식 문서에서 읽은 내용입니다(요약기를 거쳤으므로 원문 확인이 필요합니다). 확인하지 못한 것은 "미확인"으로 적었습니다.
+
+### 한눈에 보기
+
+**훅이 무엇인가요?** Claude Code가 어떤 동작 바로 앞이나 뒤에 자동으로 돌리는 작은 검사 프로그램입니다. 건물 출입구에 서 있는 경비와 같습니다. 사람이 부르지 않아도 문을 지날 때마다 확인합니다. 예: 워커가 파일을 쓰기 직전에 "이 파일이 맡은 일의 범위 안인가?"를 봅니다.
+
+**haku는 왜 원하나요?** 지금은 작업 범위를 병합할 때 검사합니다. 시험이 다 끝난 뒤 영수증을 확인하는 것과 같아서, 범위 밖 파일을 이미 고친 뒤에야 압니다. 훅은 쓰는 순간에 알려 줍니다.
+
+**웹훅, `.husky`와 무엇이 다른가요?** 이름이 비슷해서 헷갈리기 쉽습니다. 이 문서의 훅은 Claude가 파일을 쓰거나 명령을 실행하는 행동의 직전이나 직후에 매번 자동으로 도는 작은 프로그램입니다.
+
+| 이름 | 누가 언제 부르나 | 예 |
+|---|---|---|
+| 웹훅 | 외부 서비스가 신호를 보냅니다 | GitHub가 "이슈가 열렸다"고 서버에 알림 |
+| `.husky` | 사람이 `git commit`을 할 때 한 번 돕니다 | 커밋 직전에 코드 모양 검사 |
+| Claude Code 훅(이 문서) | Claude의 행동 직전이나 직후마다 자동으로 돕니다 | 파일을 쓰기 직전에 범위 검사 |
+
+**누가 이미 쓰고 있나요?** haku에는 훅이 아직 없습니다. 다른 곳에는 이미 있습니다. ECC는 `src/hooks/hooks.json`에 약 25개를 두고 Bash 실행 전, 파일 쓰기 전, 프롬프트 제출, 응답 종료, 세션 시작과 끝에 겁니다. harness 스킬 모음은 훅 6개(세션 시작, 도구 사용 전, 워크트리 진입 뒤, 응답 종료, 서브에이전트 시작과 종료)를 씁니다. 사용자 설정에는 12개 종류가 있습니다. 이번 설계는 그 방식을 haku에 맞게 작게 가져오는 것입니다. 다만 ECC와 harness 훅의 구현 세부는 읽지 않았으므로 개수와 이벤트 이름만 적었고 구현 세부는 **미확인**입니다.
+
+**훅 네 가지, 각각 예 하나씩**
+
+- 훅 A, 범위 검사: 워커가 맡은 일은 `docs/` 수정인데 `scripts/`의 파일을 쓰려 하면 알립니다(처음에는 기록만).
+- 훅 B, 푸시 차단: 워커가 기본 브랜치로 코드를 올리려 하면 막습니다.
+- 훅 C, 약화 감지: 워커가 시험을 통과시키려고 검사 설정을 느슨하게 고치면 경고합니다.
+- 훅 D, 교정 수집: 세션이 끝날 때 사용자가 "아니, 한국어로 써 줘"라고 고쳐 말한 문장을 모읍니다.
+
+**왜 작게 시작하나요?** 훅은 도구를 부를 때마다 돕니다. 파일 하나를 쓸 때도, 명령 하나를 칠 때도 돕니다. 잘못 만들면 정상 작업까지 멈춥니다. 그래서 허락한 저장소 한 곳에서, 막지 않고 기록만 하는 모드로 먼저 시작합니다.
+
+**정정 문장이란?** 사용자가 Claude의 결과를 보고 고쳐 말한 문장입니다. 예: "아니, 한국어로 써 줘", "그게 아니라 테스트도 같이 고쳐". 같은 정정이 반복되면 Claude가 같은 실수를 계속한다는 신호입니다. 이 문장을 모아 두면 `retro`가 "이 규칙을 haku에 넣자"는 후보를 찾을 때 근거가 됩니다. 지금은 사람이 retro를 불러야만 돌고, 정정은 자동으로 모이지 않습니다.
+
+**fail open과 fail closed란?** 경비가 갑자기 아파서 판단을 못 할 때 문을 어떻게 할지입니다. fail open은 문을 열어 둡니다. 안전은 줄지만 일은 계속됩니다. fail closed는 문을 잠급니다. 안전하지만 일이 멈춥니다. 예: 범위 검사 훅이 고장 나면 열어 둡니다(잘못 막으면 일이 멈추므로). 푸시 차단 훅은 워커 세션임을 확인한 뒤에만 잠급니다(되돌릴 수 없는 행동이므로).
+
+**아직 확인하지 못한 세 가지 (미확인)**
+
+- (가) Stop 훅의 무한 반복 막는 법: Stop 훅은 Claude가 끝내려 할 때 도는 훅입니다. 여기서 "계속 일해"라고 답하면 Claude가 끝나지 않을 수 있습니다. 이를 막는 방법(`stop_hook_active`)의 원문을 읽지 못했습니다. 중요한 이유는 모르고 쓰면 Claude가 멈추지 않기 때문입니다. 그래서 확인하기 전에는 Stop 훅을 쓰지 않습니다.
+- (나) 플러그인 훅을 처음 켤 때 사용자에게 묻는지: 플러그인에 훅이 들어 있을 때 "이 훅을 돌려도 되나요?"라고 한 번 물어보는지 모릅니다. 중요한 이유는 묻지 않으면 모르는 사이에 모든 프로젝트에서 훅이 돌기 때문입니다.
+- (다) 플러그인의 훅을 끄는 정확한 명령: 문제가 생겼을 때 어떻게 끄는지 정확한 명령을 모릅니다. 중요한 이유는 훅이 일을 막을 때 빨리 끌 수 있어야 하기 때문입니다.
+
+세 가지 모두 공식 문서 원문을 읽으면 되는 작은 일이며, 만들기 전에 먼저 해 두자는 것이 결정 7입니다.
 
 ### 1. 전제와 현재 상태
 
@@ -49,7 +86,7 @@
 | 위험 | haku를 쓰지 않는 프로젝트에도 닿습니다. no-op 판별이 틀리면 남의 작업을 막습니다. | 파일이 어긋나면 훅이 낡은 상태로 남습니다. | 켜지 않은 사람은 보호가 없습니다. |
 
 - 플러그인 훅의 승인 절차(처음 켤 때 사용자에게 묻는지)는 문서에서 찾지 못했습니다(**미확인**). 검색 요약에는 "폴더 신뢰 대화상자가 수락될 때까지 훅이 보류된다"는 말이 있으나 본문이 아니라 확인하지 못했습니다.
-- **권장**: 처음에는 선택 설치(저장소 로컬 `settings.local.json`)만 씁니다. 범위가 가장 작고, 끄기가 쉽고, `setup`의 "전역은 따로 묻는다" 규칙과 맞습니다. 플러그인 `hooks.json`은 시범에서 오탐이 없다고 확인된 뒤 다시 결정합니다.
+- **확정(결정 1)**: 처음에는 선택 설치(저장소 로컬 `settings.local.json`)만 씁니다. 범위가 가장 작고, 끄기가 쉽고, `setup`의 "전역은 따로 묻는다" 규칙과 맞습니다. 플러그인 `hooks.json`은 시범에서 오탐이 없다고 확인된 뒤 다시 결정합니다.
 - 어느 쪽이든 훅 스크립트는 `${CLAUDE_PLUGIN_ROOT}`에서 실행하되 상태는 그곳에 쓰지 않습니다(업데이트 때 경로가 바뀝니다). 상태는 `${CLAUDE_PLUGIN_DATA}`에 둡니다.
 - `.claude/` 설정을 고치는 일은 워커 범위 밖입니다. 설치는 오케스트레이터가 사용자 동의를 받아 합니다.
 
@@ -72,7 +109,7 @@
 | 절대 저장하지 않는 것 | 비밀값(토큰, 키, 비밀번호 모양), 개인 경로(`scripts/lib/personal-paths.js`의 규칙을 그대로 사용), 대화 전체, 어시스턴트의 말, 도구 출력, 파일 내용. |
 | 걸러내기 | 문장에 비밀 모양이나 개인 경로가 있으면 가리지 않고 **그 문장을 통째로 버립니다**. 가린 흔적이 남는 것보다 낫습니다. 걸러내기 규칙은 시험으로 고정합니다. |
 | 어디에 | 로컬 파일 하나: `${CLAUDE_PLUGIN_DATA}/corrections/<저장소 해시>.jsonl`. 저장소 안(`.haku/`)에는 쓰지 않습니다. 커밋될 수 있기 때문입니다. GitHub 이슈에는 자동으로 올리지 않습니다. |
-| 보존 | 30일. 쓸 때마다 오래된 줄을 지웁니다. |
+| 보존 | 30일(권장안, 결정 6에서 확정 전). 쓸 때마다 오래된 줄을 지웁니다. |
 | 지우기 | 한 명령: `node scripts/issues.js corrections clear`(구현 때 만듦). 파일을 직접 지워도 됩니다. 훅을 끄면 새로 쌓이지 않습니다. 제거해도 데이터가 남는 일이 없도록 `setup`의 끄기 절차에 삭제를 포함합니다. |
 | 켜기 | `.haku/config.json`의 설정과 `setup`의 동의, 둘 다 있어야 합니다. 켠 사실을 첫 수집 때 한 번 알립니다. |
 
@@ -122,45 +159,63 @@
 
 ### 8. 사용자가 고를 결정 목록
 
-각 항목은 선택지 질문으로 그대로 쓸 수 있게 적었습니다. 권장안이 첫 번째입니다.
+결정 1~5는 사용자가 이미 고른 **확정된 결정**입니다. 다시 묻지 않습니다. 결정 6~8만 **열린 결정**입니다. 열린 결정은 선택지 질문으로 그대로 쓸 수 있게 적었고, 권장안이 첫 번째입니다.
 
 #### 결정 1. 훅을 어디에 둘까
 
+- 상태: **확정된 결정**
+- 쉬운 설명: 경비를 모든 건물에 세울지, 허락한 건물에만 세울지 정하는 일입니다.
+- 예: 플러그인에 넣으면 haku를 안 쓰는 프로젝트에서도 훅이 돕니다. 저장소 로컬 선택 설치는 사용자가 "여기는 켜 달라"고 한 저장소에서만 돕니다.
 - 질문: 훅을 어디에 설치할까요?
-- 선택지: (a) 저장소 로컬 선택 설치만 (Recommended), (b) 플러그인 `hooks/hooks.json` 전역, (c) 공유 `.claude/settings.json`
+- 선택지: (a) 저장소 로컬 선택 설치만 (확정), (b) 플러그인 `hooks/hooks.json` 전역, (c) 공유 `.claude/settings.json`
 - 달라지는 것: (a)는 동의한 저장소에만 닿고 끄기 쉽습니다. (b)는 모든 프로젝트에 닿습니다. (c)는 팀 전원에게 닿습니다.
-- 권장: (a). 영향 범위가 가장 작고 `setup` 규칙과 맞습니다.
+- 확정된 답: (a) 저장소 로컬 선택 설치만. 영향 범위가 가장 작고 `setup` 규칙과 맞습니다.
 
 #### 결정 2. 처음에 만들 훅
 
+- 상태: **확정된 결정**
+- 쉬운 설명: 여러 경비 중 어느 하나를 가장 먼저 세워 보는지 정하는 일입니다.
+- 예: 훅 A는 워커가 범위 밖 파일을 쓰려 할 때 알립니다. 처음에는 막지 않고 기록만 해서, 잘못 알리는 횟수를 먼저 셉니다.
 - 질문: 첫 시범으로 어떤 훅을 만들까요?
-- 선택지: (a) 작업 파일 범위 검사, 기록만 하는 모드 (Recommended), (b) 검사 약화 경고, (c) 푸시 차단
+- 선택지: (a) 작업 파일 범위 검사, 기록만 하는 모드 (확정), (b) 검사 약화 경고, (c) 푸시 차단
 - 달라지는 것: (a)는 가치와 오탐을 가장 먼저 알 수 있습니다. (b)는 가장 안전하지만 이미 사후 경고가 있습니다. (c)는 효과가 크나 우회 위험이 큽니다.
-- 권장: (a). 후보 1의 추천(작은 시범 하나)과 같습니다.
+- 확정된 답: (a) 작업 파일 범위 검사를 기록만 하는 모드로. 후보 1의 추천(작은 시범 하나)과 같습니다.
 
 #### 결정 3. 푸시 차단이 고장 났을 때
 
+- 상태: **확정된 결정**
+- 쉬운 설명: 경비가 아파서 판단을 못 할 때 문을 잠글지 열어 둘지 정하는 일입니다(fail closed와 fail open).
+- 예: 훅이 죽었을 때 모든 Bash를 막으면 정상 작업도 다 멈춥니다. 워커 세션이 확인된 때만 잠그면, 그 밖의 세션은 영향이 없습니다.
 - 질문: 푸시 차단 훅이 오류로 판단하지 못하면 어떻게 할까요?
-- 선택지: (a) 워커 세션이 확인된 경우에만 막고 그 밖은 통과 (Recommended), (b) 항상 막음(`onFailure: block`), (c) 항상 통과
+- 선택지: (a) 워커 세션이 확인된 경우에만 막고 그 밖은 통과 (확정), (b) 항상 막음(`onFailure: block`), (c) 항상 통과
 - 달라지는 것: (b)는 훅이 죽으면 모든 Bash가 멈춥니다. (c)는 훅이 있어도 없는 것과 같을 수 있습니다.
-- 권장: (a). 막는 쪽은 판별이 끝난 뒤에만 닫습니다.
+- 확정된 답: (a) 워커 세션이 확인된 경우에만 막고 나머지는 통과. 막는 쪽은 판별이 끝난 뒤에만 닫습니다.
 
 #### 결정 4. 교정 자동 수집을 할까
 
+- 상태: **확정된 결정**
+- 쉬운 설명: 사용자의 정정 문장을 기계가 알아서 모을지, 사람이 표시한 것만 읽을지 정하는 일입니다.
+- 예: 자동은 세션이 끝날 때 "아니, 한국어로 써 줘" 같은 문장을 알아서 줍습니다. 수동은 사용자가 "이건 기억해 줘"라고 표시한 문장만 `retro`가 읽습니다.
 - 질문: 사용자의 정정을 자동으로 모을까요?
-- 선택지: (a) 먼저 수동 표시와 `retro` 읽기만 만들고 자동 수집은 나중에 (Recommended), (b) 처음부터 자동 수집(꺼진 기본값), (c) 하지 않음
+- 선택지: (a) 먼저 수동 표시와 `retro` 읽기만 만들고 자동 수집은 나중에 (확정), (b) 처음부터 자동 수집(꺼진 기본값), (c) 하지 않음
 - 달라지는 것: (a)는 개인정보 위험 없이 흐름을 먼저 확인합니다. (b)는 빠르지만 걸러내기 규칙을 먼저 완성해야 합니다. (c)는 후보 13을 버립니다.
-- 권장: (a). 후보 13의 "보류" 추천과 맞습니다.
+- 확정된 답: (a) 수동 표시와 `retro` 읽기 먼저, 자동은 나중에. 후보 13의 "보류" 추천과 맞습니다.
 
 #### 결정 5. 정정 문장을 어디에 저장할까
 
+- 상태: **확정된 결정**
+- 쉬운 설명: 모은 문장을 내 컴퓨터의 서랍에 둘지, 저장소나 GitHub에 올릴지 정하는 일입니다.
+- 예: 저장소 안 파일은 실수로 커밋돼 남들이 볼 수 있습니다. 저장소 밖 로컬 파일은 내 컴퓨터를 벗어나지 않습니다.
 - 질문: 수집한 문장은 어디에 둘까요?
-- 선택지: (a) 로컬 파일만, 저장소 밖 (Recommended), (b) 저장소 안 `.haku/` 파일, (c) GitHub 이슈
+- 선택지: (a) 로컬 파일만, 저장소 밖 (확정), (b) 저장소 안 `.haku/` 파일, (c) GitHub 이슈
 - 달라지는 것: (a)는 내 컴퓨터를 벗어나지 않습니다. (b)는 커밋될 수 있습니다. (c)는 공개 저장소면 누구나 읽습니다.
-- 권장: (a). 이슈로 가는 것은 `retro`에서 사용자가 승인한 항목뿐입니다.
+- 확정된 답: (a) 로컬 파일만, 저장소 밖. 이슈로 가는 것은 `retro`에서 사용자가 승인한 항목뿐입니다.
 
 #### 결정 6. 보존 기간
 
+- 상태: **열린 결정**
+- 쉬운 설명: 모은 문장을 서랍에 며칠 두었다가 버릴지 정하는 일입니다.
+- 예: 7일이면 일주일 뒤에 `retro`를 돌릴 때 후보가 이미 사라져 있을 수 있습니다. 30일이면 한 달은 남습니다.
 - 질문: 로컬 파일은 며칠 보관할까요?
 - 선택지: (a) 30일 (Recommended), (b) 7일, (c) 지울 때까지
 - 달라지는 것: 짧을수록 남는 위험이 작고, `retro`를 늦게 돌리면 후보가 사라집니다.
@@ -168,21 +223,64 @@
 
 #### 결정 7. 미확인 항목을 먼저 확인할까
 
+- 상태: **열린 결정**
+- 쉬운 설명: 1절의 "미확인 세 가지"를 짓기 전에 작은 일로 먼저 확인할지, 해당 훅을 만들 때 확인할지 정하는 일입니다.
+- 예: Stop 훅의 무한 반복을 막는 법을 모른 채 Stop 훅을 만들면 Claude가 멈추지 않을 수 있습니다. 먼저 원문에서 읽어 두면 그런 일을 피합니다.
 - 질문: Stop 반복 방지, 플러그인 훅 승인 절차, 플러그인 끄기 명령을 구현 전에 원문에서 확인할까요?
 - 선택지: (a) 0단계에서 먼저 확인 (Recommended), (b) 해당 훅을 만들 때 확인
 - 달라지는 것: (a)는 설계가 바뀔 가능성을 앞에서 줄입니다. (b)는 시작이 빠릅니다.
-- 권장: (a). 결정 1에서 (b)를 고르면 필수입니다.
+- 권장: (a). 확인은 짧은 일이고, 결과에 따라 이후 단계가 바뀔 수 있습니다.
 
 #### 결정 8. 이 설계를 승인하고 구현 계획을 세울까
 
+- 상태: **열린 결정**
+- 쉬운 설명: 이 문서의 내용대로 실제 만들기를 시작해도 좋은지 정하는 일입니다.
+- 예: 승인하면 7절 1단계(공용 함수와 범위 검사 기록 모드)의 이슈와 계획이 만들어집니다. 보류하면 코드가 바뀌는 것은 없습니다.
 - 질문: 이 문서를 승인하고 7절의 순서로 구현 계획을 세울까요?
 - 선택지: (a) 승인, 1단계부터 계획 (Recommended), (b) 수정 후 다시 검토, (c) 보류
 - 달라지는 것: (a)는 새 계획과 이슈가 만들어집니다. (b)(c)는 코드 변경이 없습니다.
-- 권장: (a). 단 결정 1~7을 먼저 고른 뒤.
+- 권장: (a). 단 결정 6~7을 먼저 고른 뒤.
 
 ## English
 
-**Status**: a design draft, not an implementation. After the user approves this document, the implementation is planned as a new plan. The sources are candidate 1 (hook safety net) and candidate 13 (automatic correction capture) in `docs/ideas-from-others.md`. Claude Code hook behavior is what the official docs said when read on 2026-10-30 (the text passed a summarizer, so check the original). Whatever could not be confirmed is marked "unverified".
+**Status**: a design draft (decisions 1 to 5 decided, 6 to 8 open), not an implementation. After the user approves this document, the implementation is planned as a new plan. The sources are candidate 1 (hook safety net) and candidate 13 (automatic correction capture) in `docs/ideas-from-others.md`. Claude Code hook behavior is what the official docs said when read on 2026-10-30 (the text passed a summarizer, so check the original). Whatever could not be confirmed is marked "unverified".
+
+### At a glance
+
+**What is a hook?** A small check that Claude Code runs automatically just before or after an action. It is like a guard standing at a building entrance: nobody has to call it, it checks every time someone passes. Example: just before a worker writes a file, the hook asks "is this file inside the scope of the assigned task?".
+
+**Why does haku want one?** Today the task scope is checked at merge time. That is like checking the receipt after the shopping is over: haku learns about a file outside the scope only after it was changed. A hook tells at the moment of writing.
+
+**How is it different from a webhook or `.husky`?** The names are easy to mix up. The hook in this document is a small program that runs automatically, every time, just before or just after Claude writes a file or runs a command.
+
+| Name | Who calls it, and when | Example |
+|---|---|---|
+| Webhook | An outside service sends a signal | GitHub tells a server "an issue was opened" |
+| `.husky` | Runs once when a person does `git commit` | Code-style check just before the commit |
+| Claude Code hook (this document) | Runs automatically before or after each action of Claude | Scope check just before a file is written |
+
+**Who already uses hooks?** haku has no hooks yet. Other places do. ECC has about 25 in `src/hooks/hooks.json`, attached before Bash runs, before file writes, at prompt submit, at the end of a response, and at session start and end. The harness skill set uses 6 hooks (session start, before tool use, after entering a worktree, end of a response, subagent start and stop). The user settings have 12 kinds. This design takes that approach into haku in a small, fitted form. The implementation details of the ECC and harness hooks were not read, so only counts and event names are given, and the implementation details are **unverified**.
+
+**The four hooks, one example each**
+
+- Hook A, scope check: the worker's task is editing `docs/`, but it tries to write a file under `scripts/`. The hook notices (at first it only records).
+- Hook B, push block: the worker tries to push code to the default branch. The hook blocks it.
+- Hook C, weakening detection: the worker loosens a check setting just to make the tests pass. The hook warns.
+- Hook D, correction capture: at the end of a session it collects a sentence where the user corrected Claude, such as "no, write it in Korean".
+
+**Why start small?** Hooks run on every tool call: every file write and every command. A badly made hook stops normal work too. So the first step is one repository that agreed, in a mode that only records and does not block.
+
+**What is a correction sentence?** A sentence in which the user corrects Claude after seeing its result. Examples: "no, write it in Korean", "not that, fix the tests as well". If the same correction repeats, it is a sign that Claude keeps making the same mistake. Saved sentences give `retro` evidence when it looks for a candidate such as "let us put this rule into haku". Today `retro` runs only when a person calls it, and corrections are not collected automatically.
+
+**What are fail open and fail closed?** They say what the door does when the guard suddenly falls ill and cannot decide. Fail open leaves the door open: less safe, but work goes on. Fail closed locks the door: safe, but work stops. Example: if the scope-check hook breaks, the door stays open (a wrong block would stop the work). The push-block hook locks the door only after it has confirmed this is a worker session (because a push cannot be undone).
+
+**Three things not yet confirmed (unverified)**
+
+- (a) How to stop a Stop hook from looping forever: a Stop hook runs when Claude is about to finish. If it answers "keep working", Claude may never finish. The original page about the way to prevent this (`stop_hook_active`) was not read. It matters because without it Claude may not stop, so no Stop hook is used until this is confirmed.
+- (b) Whether the user is asked once before a plugin's hook is allowed to run: it is not known whether Claude Code asks "may this hook run?" when a plugin ships hooks. It matters because without a question, hooks would start running in every project without anyone noticing.
+- (c) The exact command to turn a plugin's hooks off: the exact command is not known. It matters because when a hook blocks work, it must be possible to turn it off quickly.
+
+All three are small jobs: read the official pages. Decision 7 is about doing them before building.
 
 ### 1. Premises and current state
 
@@ -229,7 +327,7 @@ Hooks are not a security boundary. Compound commands, config-override options, a
 | Risk | reaches projects that do not use haku. A wrong no-op check blocks someone else's work. | the file can drift and leave stale hooks | people who do not opt in have no protection |
 
 - Whether plugin hooks need an approval step when first enabled was not found in the docs (**unverified**). A search summary said hooks are held until the folder trust dialog is accepted, but that was not page text and is not confirmed.
-- **Recommendation**: start with the opt-in install only (repository-local `settings.local.json`). It has the smallest reach, is easy to turn off, and matches the `setup` rule "ask about global changes separately". Decide on the plugin `hooks.json` again after the pilot shows no false positives.
+- **Decided (decision 1)**: start with the opt-in install only (repository-local `settings.local.json`). It has the smallest reach, is easy to turn off, and matches the `setup` rule "ask about global changes separately". Decide on the plugin `hooks.json` again after the pilot shows no false positives.
 - In either case the scripts run from `${CLAUDE_PLUGIN_ROOT}` but write no state there (the path changes on update). State goes to `${CLAUDE_PLUGIN_DATA}`.
 - Editing `.claude/` settings is outside a worker's scope. The orchestrator installs after the user agrees.
 
@@ -252,7 +350,7 @@ Storage rules:
 | Never stored | Secret values (token, key, password shapes), personal paths (use the rules of `scripts/lib/personal-paths.js` as they are), the whole conversation, assistant text, tool output, file contents. |
 | Filtering | If a sentence has a secret shape or a personal path, **drop the whole sentence**; do not mask it. A mask leaves a trace and is worse than dropping. The filter rules are pinned by tests. |
 | Where | One local file: `${CLAUDE_PLUGIN_DATA}/corrections/<repository hash>.jsonl`. Nothing is written inside the repository (`.haku/`), because it could be committed. Nothing is posted to a GitHub issue automatically. |
-| Retention | 30 days. Every write removes older lines. |
+| Retention | 30 days (recommended, not yet decided in decision 6). Every write removes older lines. |
 | Deleting | One command: `node scripts/issues.js corrections clear` (to be built at implementation). Deleting the file by hand also works. Turning the hook off stops new lines. So that uninstalling does not leave data behind, the turn-off steps of `setup` include the deletion. |
 | Turning on | Both a setting in `.haku/config.json` and the agreement in `setup` are needed. The first capture says once that it is on. |
 
@@ -302,45 +400,63 @@ Each stage is its own issue and PR, and the next starts after the result of the 
 
 ### 8. Decision list for the user
 
-Each item is written so it can be used as a choice question as it is. The recommendation is the first option.
+Decisions 1 to 5 are **Decided**: the user already chose them and they are not asked again. Only decisions 6 to 8 are **Open**. The open ones are written so they can be used as choice questions as they are, and the recommendation is the first option.
 
 #### Decision 1. Where should the hooks live
 
+- Status: **Decided**
+- Plain version: choose whether guards stand at every building or only at buildings that agreed.
+- Example: a plugin hook also runs in projects that do not use haku. A repository-local opt-in install runs only in the repositories where the user said "turn it on here".
 - Question: where should the hooks be installed?
-- Options: (a) repository-local opt-in install only (Recommended), (b) plugin `hooks/hooks.json`, global, (c) shared `.claude/settings.json`
+- Options: (a) repository-local opt-in install only (chosen), (b) plugin `hooks/hooks.json`, global, (c) shared `.claude/settings.json`
 - What changes: (a) reaches only the repositories that agreed and is easy to turn off. (b) reaches every project. (c) reaches the whole team.
-- Recommendation: (a). It has the smallest reach and matches the `setup` rule.
+- Decided answer: (a) repository-local opt-in install only. It has the smallest reach and matches the `setup` rule.
 
 #### Decision 2. Which hook first
 
+- Status: **Decided**
+- Plain version: choose which one guard to try standing up first.
+- Example: hook A notices when a worker writes a file outside its scope. At first it does not block, it only records, so the false alarms can be counted first.
 - Question: which hook should the first pilot build?
-- Options: (a) task file-scope check, in record-only mode (Recommended), (b) weakening warning, (c) push block
+- Options: (a) task file-scope check, in record-only mode (chosen), (b) weakening warning, (c) push block
 - What changes: (a) shows the value and the false positives soonest. (b) is the safest, but a warning after the fact already exists. (c) has a big effect but a big bypass risk.
-- Recommendation: (a). It matches the advice for candidate 1 (one small pilot).
+- Decided answer: (a) the task file-scope check in record-only mode. It matches the advice for candidate 1 (one small pilot).
 
 #### Decision 3. When the push block breaks
 
+- Status: **Decided**
+- Plain version: choose whether the door is locked or left open when the guard falls ill (fail closed or fail open).
+- Example: if a dead hook blocks all Bash, even normal work stops. If it locks only when a worker session is confirmed, other sessions are untouched.
 - Question: what should the push-block hook do when it errors and cannot decide?
-- Options: (a) block only when a worker session is confirmed, otherwise pass (Recommended), (b) always block (`onFailure: block`), (c) always pass
+- Options: (a) block only when a worker session is confirmed, otherwise pass (chosen), (b) always block (`onFailure: block`), (c) always pass
 - What changes: with (b) a dead hook stops all Bash. With (c) the hook may be no better than no hook.
-- Recommendation: (a). It closes only after detection has finished.
+- Decided answer: (a) block only when a worker session is confirmed and pass otherwise. It closes only after detection has finished.
 
 #### Decision 4. Should corrections be collected automatically
 
+- Status: **Decided**
+- Plain version: choose whether a machine collects the user's correcting sentences by itself, or only the ones a person marked are read.
+- Example: automatic picks up a sentence like "no, write it in Korean" at the end of a session. Manual means `retro` reads only the sentences the user marked with "remember this".
 - Question: should the user's corrections be collected automatically?
-- Options: (a) build the manual mark and the `retro` reading first, automatic capture later (Recommended), (b) automatic capture from the start (off by default), (c) do not do it
+- Options: (a) build the manual mark and the `retro` reading first, automatic capture later (chosen), (b) automatic capture from the start (off by default), (c) do not do it
 - What changes: (a) checks the flow without privacy risk. (b) is faster but the filter must be finished first. (c) drops candidate 13.
-- Recommendation: (a). It matches the "hold" advice for candidate 13.
+- Decided answer: (a) manual mark and `retro` reading first, automatic later. It matches the "hold" advice for candidate 13.
 
 #### Decision 5. Where to store correcting sentences
 
+- Status: **Decided**
+- Plain version: choose whether collected sentences stay in a drawer on this computer, or go to the repository or GitHub.
+- Example: a file inside the repository can be committed by mistake and seen by others. A local file outside the repository never leaves this computer.
 - Question: where should the collected sentences go?
-- Options: (a) a local file only, outside the repository (Recommended), (b) a file under `.haku/` in the repository, (c) a GitHub issue
+- Options: (a) a local file only, outside the repository (chosen), (b) a file under `.haku/` in the repository, (c) a GitHub issue
 - What changes: (a) never leaves this computer. (b) may be committed. (c) is readable by anyone if the repository is public.
-- Recommendation: (a). Only items the user approved in `retro` go to an issue.
+- Decided answer: (a) a local file only, outside the repository. Only items the user approved in `retro` go to an issue.
 
 #### Decision 6. Retention period
 
+- Status: **Open**
+- Plain version: choose how many days the collected sentences stay in the drawer before they are thrown away.
+- Example: with 7 days, a `retro` run a week later may find the candidates already gone. With 30 days they last a month.
 - Question: how many days should the local file be kept?
 - Options: (a) 30 days (Recommended), (b) 7 days, (c) until deleted
 - What changes: shorter means less left behind, but candidates vanish if `retro` is run late.
@@ -348,14 +464,20 @@ Each item is written so it can be used as a choice question as it is. The recomm
 
 #### Decision 7. Check the unverified items first
 
+- Status: **Open**
+- Plain version: choose whether to check the "three unverified items" of section 1 as a small job before building, or only when the relevant hook is built.
+- Example: if a Stop hook is built without knowing how to stop its endless loop, Claude may never stop working. Reading the original page first avoids that.
 - Question: should Stop loop prevention, the plugin hook approval step and the plugin disable command be checked against the original pages before implementation?
 - Options: (a) check first, in stage 0 (Recommended), (b) check when the relevant hook is built
 - What changes: (a) lowers the chance that the design changes later. (b) starts sooner.
-- Recommendation: (a). It is required if decision 1 is (b).
+- Recommendation: (a). The check is short, and its result can change the later stages.
 
 #### Decision 8. Approve this design and plan the implementation
 
+- Status: **Open**
+- Plain version: choose whether building may start as this document describes.
+- Example: if approved, an issue and a plan for stage 1 of section 7 (shared functions and the scope check in record-only mode) are created. If held, no code changes.
 - Question: approve this document and plan the implementation in the order of section 7?
 - Options: (a) approve, plan from stage 1 (Recommended), (b) revise and review again, (c) hold
 - What changes: (a) creates a new plan and issues. (b) and (c) change no code.
-- Recommendation: (a), after decisions 1 to 7 are chosen.
+- Recommendation: (a), after decisions 6 and 7 are chosen.
