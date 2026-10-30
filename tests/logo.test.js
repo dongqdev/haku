@@ -17,6 +17,7 @@ test('the logo SVGs are plain vector art: no live text, no raster, no outside re
     assert.match(svg, /viewBox="0 0 \d+ \d+"/, f);
     assert.match(svg, /role="img"/, f);
     assert.match(svg, /aria-label="[^"]+"/, f);
+    assert.match(svg, /<title>[^<]+<\/title>/, `${f}: a <title> for accessibility`);
     assert.doesNotMatch(svg, /<text[\s>]/, `${f}: letters must be drawn as shapes, not live text (no font dependency)`);
     assert.doesNotMatch(svg, /<image[\s>]|data:|<script|<foreignObject|<style/i, f);
     assert.doesNotMatch(svg.replace('http://www.w3.org/2000/svg', ''), /https?:\/\//, `${f}: no outside references`);
@@ -24,9 +25,9 @@ test('the logo SVGs are plain vector art: no live text, no raster, no outside re
   }
 });
 
-test('the icon is a few flat colours (a logo, not an illustration)', () => {
+test('the icon is a few flat colours (a logo, not an illustration): the tile and four fill colours at most', () => {
   const colours = new Set((read('assets/haku.svg').match(/#[0-9A-Fa-f]{6}\b/g) || []).map(c => c.toUpperCase()));
-  assert.ok(colours.size <= 8, `${colours.size} colours: ${[...colours].join(' ')}`);
+  assert.ok(colours.size <= 5, `${colours.size} colours: ${[...colours].join(' ')}`);
   assert.ok(colours.size >= 3);
 });
 
@@ -43,6 +44,15 @@ test('both READMEs open with the horizontal logo, which exists', () => {
     assert.match(top, /<img src="assets\/haku-lockup\.svg"/, f);
   }
   assert.ok(fs.existsSync(path.join(root, 'assets', 'haku-lockup.svg')));
+});
+
+test('the lockup\'s letter strokes sit on clean angles (the k was 132.4 degrees once, the audit flagged it)', () => {
+  const letterK = read('assets/haku-lockup.svg').split('<!-- k')[1];
+  assert.ok(letterK, 'the k is marked in the file');
+  const k = letterK.match(/M(\d+) (\d+) L(\d+) (\d+)/);
+  assert.ok(k, 'k arm path');
+  const [x1, y1, x2, y2] = k.slice(1).map(Number);
+  assert.strictEqual(Math.abs(x1 - x2), Math.abs(y1 - y2), 'the upper arm of the k is exactly 45 degrees');
 });
 
 test('the lockup carries the icon and the same colours as the icon', () => {

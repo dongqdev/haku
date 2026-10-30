@@ -1,8 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1264 512" width="1264" height="512" role="img" aria-label="haku">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1212 512" width="1212" height="512" role="img" aria-label="haku">
+  <title>haku</title>
   <rect width="512" height="512" rx="96" fill="#F4ECE1"/>
   <!-- ears -->
-  <path d="M62 56 L224 176 L118 266 Q70 192 62 56 Z" fill="#3A241A"/>
-  <path d="M450 56 L288 176 L394 266 Q442 192 450 56 Z" fill="#3A241A"/>
+  <path d="M62 56 L224 176 L118 266 Q70 192 62 56 Z" fill="#4A2E20"/>
+  <path d="M450 56 L288 176 L394 266 Q442 192 450 56 Z" fill="#4A2E20"/>
   <path d="M104 114 L188 178 L130 226 Q108 178 104 114 Z" fill="#E2B27A"/>
   <path d="M408 114 L324 178 L382 226 Q404 178 408 114 Z" fill="#E2B27A"/>
   <!-- head -->
@@ -10,13 +11,13 @@
   <!-- white blaze flowing into the muzzle -->
   <path d="M256 156 Q282 206 290 262 Q296 296 316 318 Q346 348 342 386 Q336 438 256 450 Q176 438 170 386 Q166 348 196 318 Q216 296 222 262 Q230 206 256 156 Z" fill="#FBF7F0"/>
   <!-- tan brow dots (both dogs have them) -->
-  <circle cx="170" cy="240" r="16" fill="#C98B4B"/>
-  <circle cx="342" cy="240" r="16" fill="#C98B4B"/>
+  <circle cx="170" cy="240" r="16" fill="#E2B27A"/>
+  <circle cx="342" cy="240" r="16" fill="#E2B27A"/>
   <!-- eyes and nose -->
   <circle cx="184" cy="294" r="31" fill="#140C08"/>
   <circle cx="328" cy="294" r="31" fill="#140C08"/>
-  <circle cx="194" cy="281" r="10" fill="#FFFFFF"/>
-  <circle cx="338" cy="281" r="10" fill="#FFFFFF"/>
+  <circle cx="194" cy="281" r="10" fill="#FBF7F0"/>
+  <circle cx="338" cy="281" r="10" fill="#FBF7F0"/>
   <path d="M228 352 Q256 334 284 352 Q280 380 256 384 Q232 380 228 352 Z" fill="#140C08"/>
 
   <g transform="translate(548 16)" fill="none" stroke="#4A2E20" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
@@ -25,8 +26,8 @@
     <!-- a -->
     <circle cx="270" cy="270" r="45"/>
     <path d="M315 210 V330"/>
-    <!-- k -->
-    <path d="M410 150 V330 M476 212 L414 280 M440 262 L486 330"/>
+    <!-- k (strokes are kept as strokes: round-capped, uniform weight) -->
+    <path d="M410 150 V330 M476 212 L414 274 M440 262 L486 330"/>
     <!-- u -->
     <path d="M550 212 V282 C550 316 572 332 600 332 C630 332 648 316 648 282 V212 M648 282 V330"/>
   </g>
