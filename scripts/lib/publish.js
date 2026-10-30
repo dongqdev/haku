@@ -1,6 +1,8 @@
 'use strict';
 
 const { BASE_LABEL, typeLabel, kindLabel, WORK_KINDS, withPrefix, stripPrefix } = require('./model');
+const { WORKER_MODES } = require('./config');
+const { MAX_REASON } = require('./worker-mode');
 
 // GitHub rejects titles over 256 characters; the prefix adds up to 12, so a draft title may use 244.
 const MAX_TITLE = 244;
@@ -72,6 +74,14 @@ function validateDraft(draft) {
       need(Array.isArray(t.scope) && t.scope.length > 0, `${where}: scope (files this task may touch) is required`);
       checkVerify(where, t.verify);
       checkKind(where, t);
+      if (t.workerMode !== undefined) {
+        if (!WORKER_MODES.includes(t.workerMode)) errors.push(`${where}: workerMode must be one of ${WORKER_MODES.join('|')}`);
+        else if (t.workerMode === 'session') {
+          const reason = typeof t.workerReason === 'string' ? t.workerReason.trim() : '';
+          if (!reason) errors.push(`${where}: workerMode session needs a workerReason (which tool a subagent does not have)`);
+          else if (reason.length > MAX_REASON || /\n/.test(reason)) errors.push(`${where}: workerReason must be one line of at most ${MAX_REASON} characters`);
+        }
+      }
     }
   }
   for (const m of draft.milestones) {
@@ -125,6 +135,10 @@ function renderBody(entry, numbers, children = []) {
   lines.push(`Verify-Kind: ${node.verify.kind}`);
   if (node.verify.profile) lines.push(`Verify-Profile: ${node.verify.profile}`);
   if (type === 'story' && node.mergeMode) lines.push(`Merge-Mode: ${node.mergeMode}`);
+  if (type === 'task' && node.workerMode) {
+    lines.push(`Worker-Mode: ${node.workerMode}`);
+    if (node.workerMode === 'session') lines.push(`Worker-Reason: ${node.workerReason.trim()}`);
+  }
   if (node.scope) lines.push(`Scope: ${node.scope.join(', ')}`);
   if ((node.dependsOn || []).length) {
     lines.push(`Depends-On: ${node.dependsOn.map(d => `#${numbers.get(d)}`).join(', ')}`);
@@ -145,6 +159,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     key: e.key,
     type: e.type,
     kind: e.node.kind || null,
+    workerMode: e.type === 'task' ? (e.node.workerMode || null) : null,
     title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));

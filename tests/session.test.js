@@ -448,7 +448,7 @@ test('issues.js config prints the effective settings', () => {
 test('the skill, the worker rules and the README describe the two worker modes and the blocked-session case', () => {
   const read = f => fs.readFileSync(path.join(pluginRoot, f), 'utf8').replace(/\r\n/g, '\n');
   const build = read('skills/build/SKILL.md');
-  assert.match(build, /`worker\.mode` is `subagent` \(the default\) or `session`/);
+  assert.match(build, /issues\.js worker-mode --issue N`: its `mode` is `subagent` \(the default\) or `session`/);
   assert.match(build, /issues\.js worker-launch --issue N --orchestrator <your session name>/);
   assert.match(build, /ListAgents \(it says "This session is <name>"\)/);
   assert.match(build, /do not poll, and end your turn while you wait/);

@@ -13,6 +13,7 @@ const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
 const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitions } = require('./lib/model');
 const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
+const { effectiveWorkerMode } = require('./lib/worker-mode');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
@@ -34,6 +35,7 @@ Usage:
   issues.js done-check --issue <N> [--json]
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
   issues.js worker-launch --issue <N> --orchestrator <session name> [--base <branch>] [--cwd <dir>]
+  issues.js worker-mode --issue <N> [--cwd <dir>] [--repo <owner/repo>]
   issues.js worker-list [--cwd <dir>]
   issues.js config [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon] [--discard]
@@ -67,6 +69,8 @@ pr-config-changes  Lists the files of a pull request that could weaken its own c
 labels        Lists the labels haku owns (base, type, kind, state) with colours; --apply creates them on the repository.
 label         Adds or removes one issue's state labels (deferred, blocked, needs-user) and sets its kind label; an issue keeps
               exactly one kind. Other labels are refused.
+worker-mode   Prints the mode a worker for this task runs in (subagent or session): the task's own Worker-Mode line, else the
+              repository's workerMode. A line that cannot be used (unknown value, session without a reason) is an error.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
@@ -206,6 +210,13 @@ function main(argv) {
       const cfg = readConfig(opts.cwd || process.cwd());
       for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
       out({ file: cfg.file, config: cfg.config, titlePrefix: titlePrefixOn(cfg.config), worker: workerSettings(cfg.config) });
+      return 0;
+    }
+    case 'worker-mode': {
+      needIssue(opts);
+      const cfg = readConfig(opts.cwd || process.cwd());
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      out(effectiveWorkerMode(host().getIssue(opts.issue), cfg.config));
       return 0;
     }
     case 'worker-list':
