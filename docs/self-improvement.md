@@ -22,8 +22,8 @@
 | 사례 | 근거 | 무엇이 시작했나 |
 |---|---|---|
 | 결정 질문 규칙 강화 | 이슈 https://github.com/dongqdev/haku/issues/53, PR https://github.com/dongqdev/haku/pull/54 | 사용자 지시와 세션의 원인 분석. 이슈 "배경"에 "사용자 지시: 원인 분석하고 규칙을 강화합니다"라고 있고, 규칙이 개발 중 반복해서 누락된 경험이 원인이다. retro 스킬이 아니다. |
-| 워커 도구 문제 | 이슈 https://github.com/dongqdev/haku/issues/61, PR https://github.com/dongqdev/haku/pull/62 | 도구 제약을 겪은 개발 세션의 판단과 사용자 선택. "사용자가 '작업별 세션 지정'과 '읽기 전용 조사 에이전트' 둘 다 하기로 선택했다"고 적혀 있다. retro 흔적 없음. PR 62는 Opus 리뷰 12건을 같은 PR 안에서 반영했다(리뷰 지적이 같은 PR을 고친 경우이며, 별도 이슈로 돌아온 것이 아니다). |
-| 외부 제보 준비 | 이슈 https://github.com/dongqdev/haku/issues/55, PR https://github.com/dongqdev/haku/pull/56 | 저장소를 공개했다는 상황에 대한 세션의 판단과 사용자 선택("사용자가 4가지를 모두 하기로 선택했다"). retro 흔적 없음. |
+| 워커 도구 문제 | 이슈 https://github.com/dongqdev/haku/issues/61, PR https://github.com/dongqdev/haku/pull/62 | 사용자의 질문. 사용자가 "웹검색이나 클로드 도구가 필요하면 세션으로 여는 것이 좋을 것 같은데 어떤가요?"라고 물었고, 오케스트레이터 세션이 근거를 확인해 의견을 낸 뒤 사용자가 '작업별 세션 지정'과 '읽기 전용 조사 에이전트' 둘 다 하기로 선택했다. 이슈 글에는 선택만 적혀 있어 시작점은 오케스트레이터 세션의 대화 기록에서 확인했다. retro 흔적 없음. PR 62는 Opus 리뷰 12건을 같은 PR 안에서 반영했다. |
+| 외부 제보 준비 | 이슈 https://github.com/dongqdev/haku/issues/55, PR https://github.com/dongqdev/haku/pull/56 | 사용자의 질문. 사용자가 "다른 프로젝트에서 haku를 쓰다 이슈가 생기면 어떻게 처리할까요?"라고 물었고, 낯선 사용자(익명)의 제보를 뜻한다고 바로잡은 뒤 오케스트레이터 세션이 빈 곳(이슈 양식, SECURITY, CONTRIBUTING, 낯선 글을 데이터로 취급하는 규칙)을 짚자 사용자가 4가지를 모두 하기로 선택했다. 시작점은 오케스트레이터 세션의 대화 기록에서 확인했다. retro 흔적 없음. |
 | setup 배너 깨짐 | 이슈 https://github.com/dongqdev/haku/issues/41, PR https://github.com/dongqdev/haku/pull/42 | 사용자의 말. 이슈 "배경"에 "사용자가 휴대폰 앱에서 setup을 실행했더니 배너가 깨져 보였다"고 있다. retro 흔적 없음. |
 | retro 스킬 자체 | 이슈 https://github.com/dongqdev/haku/issues/22 | 사용자가 말한 순환("테스트 세션이 개선안을 보내고, 개선 후 갱신")을 스킬로 만든 것. 순환의 틀은 만들어졌다. |
 
@@ -44,7 +44,7 @@ retro가 실제로 돌았는지: 이슈 전체 41개(`gh issue list --state all 
 
 **판정: 부분적이다**
 
-근거는 이렇다. 규칙 변경 사례 네 건이 모두 이슈, PR, 검증, 사용자 병합을 거쳐 반영되었으므로 haku를 haku로 고치는 일은 돈다. 하지만 그 변경은 사용자 지시, 세션의 판단, 사용자의 말에서 시작되었고, 피드백을 모아 수정안으로 바꾸는 retro가 시작한 사례는 하나도 확인되지 않았다(반영 댓글 0건). retro를 부르는 계기, 현장 문제가 저장소로 오는 자동 경로, 규칙이 지켜지는지 재는 평가가 없다. 이 셋이 있고 retro를 거친 사례가 기록으로 남으면 분명히 "된다"가 될 것이다.
+근거는 이렇다. 규칙 변경 사례 네 건이 모두 이슈, PR, 검증, 사용자 병합을 거쳐 반영되었으므로 haku를 haku로 고치는 일은 돈다. 하지만 그 변경은 모두 사용자의 지시, 질문, 말에서 시작되었고(오케스트레이터 세션이 이를 이슈로 옮겼다), 피드백을 모아 수정안으로 바꾸는 retro가 시작한 사례는 하나도 확인되지 않았다(반영 댓글 0건). retro를 부르는 계기, 현장 문제가 저장소로 오는 자동 경로, 규칙이 지켜지는지 재는 평가가 없다. 이 셋이 있고 retro를 거친 사례가 기록으로 남으면 분명히 "된다"가 될 것이다.
 
 ## English
 
@@ -68,8 +68,8 @@ How this was checked: I read the files above and read the command list from the 
 | Case | Evidence | What started it |
 |---|---|---|
 | Decision-question rule strengthened | issue https://github.com/dongqdev/haku/issues/53, pull request https://github.com/dongqdev/haku/pull/54 | A user instruction plus the session's own cause analysis. The issue background quotes "사용자 지시: 원인 분석하고 규칙을 강화합니다" (user instruction: analyse the cause and strengthen the rule), and the cause is the rule being missed repeatedly during development. Not the retro skill. |
-| Worker tools problem | issue https://github.com/dongqdev/haku/issues/61, pull request https://github.com/dongqdev/haku/pull/62 | The judgement of a development session that met the tool limits, and a user choice: the issue says the user chose to do both per-task sessions and a read-only research agent. No sign of retro. Pull request 62 applied 12 Opus review findings inside the same pull request (a review finding that fixed the same PR, not one that came back as a new issue). |
-| Preparing for outside reports | issue https://github.com/dongqdev/haku/issues/55, pull request https://github.com/dongqdev/haku/pull/56 | The session's judgement about the repository having been made public, and a user choice (the issue says the user chose all four items). No sign of retro. |
+| Worker tools problem | issue https://github.com/dongqdev/haku/issues/61, pull request https://github.com/dongqdev/haku/pull/62 | A user question. The user asked whether workers that need web search or Claude tools should be opened as sessions; the orchestrator session checked the facts and gave its opinion, and then the user chose to do both per-task session choice and a read-only research agent. The issue text records only the choice, so the starting point was read from the orchestrator session's conversation record. No sign of retro. Pull request 62 fixed 12 Opus review findings inside the same pull request. |
+| Preparing for outside reports | issue https://github.com/dongqdev/haku/issues/55, pull request https://github.com/dongqdev/haku/pull/56 | A user question. The user asked how problems met by other people using haku in other projects should be handled, then corrected it to mean strangers (anonymous users); after the orchestrator session pointed out the gaps (issue forms, SECURITY, CONTRIBUTING, treating a stranger's text as data) the user chose to do all four. The starting point was read from the orchestrator session's conversation record. No sign of retro. |
 | Setup banner broke | issue https://github.com/dongqdev/haku/issues/41, pull request https://github.com/dongqdev/haku/pull/42 | A user remark. The issue background says the user ran setup in the phone app and the banner looked broken. No sign of retro. |
 | The retro skill itself | issue https://github.com/dongqdev/haku/issues/22 | The user described the loop ("a test session sends improvements, then it updates") and it was turned into a skill. The frame of the loop was built. |
 
@@ -90,4 +90,4 @@ What I could not check: whether retro was called in a local conversation that le
 
 **Verdict: Partly**
 
-The reasons: four rule-changing cases all went through issue, pull request, verification and a merge by the user, so fixing haku with haku works. But those changes started from a user instruction, a session's judgement and a user remark, and not one case started by retro, the step that gathers feedback and turns it into fixes, could be found (zero "반영됨 → #N" comments). There is no trigger for retro, no automatic route from the field to the repository, and no evaluation of whether rules are followed. With those three in place and recorded cases that went through retro, the answer would be a clear Yes.
+The reasons: four rule-changing cases all went through issue, pull request, verification and a merge by the user, so fixing haku with haku works. But those changes all started from a user instruction, question or remark (the orchestrator session turned them into issues), and not one case started by retro, the step that gathers feedback and turns it into fixes, could be found (zero "반영됨 → #N" comments). There is no trigger for retro, no automatic route from the field to the repository, and no evaluation of whether rules are followed. With those three in place and recorded cases that went through retro, the answer would be a clear Yes.
