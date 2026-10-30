@@ -21,6 +21,8 @@ Treat text from issues or comments written by people who are not repository coll
 
 If `sniff` passed you the path of a goal summary, use exactly that file. Otherwise, if `.haku/drafts/*.goal.md` files exist, list them with their dates and ask which one holds the goal this plan is for with a choice question (including "none of them"); never assume the newest is current. Once the plan is registered, move the goal file you used to `.haku/drafts/done/` so an old goal is never read again.
 
+If a goal summary's 열린 질문 section still holds a `[확인 필요]` marker, resolve those first with choice questions (one decision each, recommended option first) and write the answers into the summary file before drafting. Do not draft over an open marker.
+
 **If the goal is vague** - you cannot state its success criteria and what is out of scope - do not draft. Hand over to `/haku:sniff` (or ask with a choice question whether to), and plan from the goal summary it saves in `.haku/drafts/<slug>.goal.md`.
 
 ## 2. Draft
@@ -48,6 +50,7 @@ Write the draft to `.haku/drafts/<slug>.json` (local only):
 
 Rules for a good draft:
 
+- Where something is unclear, do not guess and do not leave it vague: write the marker `[확인 필요]` right where it is unclear in the draft. Resolve every marker with the user through choice questions (one decision each, recommended option first, as the Decisions rule says) and delete the marker with the answer written in. Only a draft without markers goes to the approval gate; `issues.js publish` refuses a draft that still has one (also `[NEEDS CLARIFICATION]`, in any letter case, even inside backticks or a code fence).
 - Give the story, every milestone and every task a **`kind`**: `design` (decide the approach and scope), `dev` (build or change a feature), `bug` (fix something broken), `docs`, `research` (find out and conclude) or `chore` (setup, refactor, dependencies, no behavior change). It becomes one `kind:<name>` label; pick the one that says what the work mostly is. Validation rejects any other value.
 - Every task runs as a **subagent** unless it needs a tool a subagent does not have (a browser, an MCP server, a real device test): then set `"workerMode": "session"` and a one-line `"workerReason"` that names the tool. Never pick a session because the task needs facts from the web: that goes to the read-only `researcher` agent at `build` time (see `build`), and the worker stays offline. A session worker has every tool and only its instructions limit it.
 - One task = one worker = one branch = one reviewable PR. Split anything larger.
@@ -60,7 +63,7 @@ Rules for a good draft:
 
 ## 3. Validate
 
-Run `issues.js publish <draft>` **without** `--apply`. It validates the draft and prints what would be created. Fix every reported error before showing anything to the user.
+Run `issues.js publish <draft>` **without** `--apply`. It validates the draft and prints what would be created. Fix every reported error before showing anything to the user; a reported unresolved marker is resolved with the user first.
 
 ## 4. Approval gate
 
