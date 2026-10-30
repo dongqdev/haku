@@ -35,7 +35,7 @@ test('the bug form asks for the facts needed to reproduce, each required', () =>
 
 test('the issue chooser sends security problems to private reporting, not a public issue', () => {
   const cfg = read('.github/ISSUE_TEMPLATE/config.yml');
-  assert.match(cfg, /url: https:\/\/github\.com\/dongqdev\/haku-harness\/security\/advisories\/new/);
+  assert.match(cfg, /url: https:\/\/github\.com\/dongqdev\/haku\/security\/advisories\/new/);
 });
 
 test('SECURITY.md and CONTRIBUTING.md are written in Korean and in English', () => {

@@ -32,7 +32,8 @@ test('the detector catches every respelling of the old names', () => {
     "path.join(os.homedir(), '." + 'eh' + "')", 'C:\\Users\\<name>\\.' + 'eh' + '\\w', '~/.' + 'eh' + '/w', '.' + 'eh'
   ];
   for (const s of spellings) assert.ok(findOld(s).length > 0, `not detected: ${s}`);
-  for (const ok of ['haku-harness', '.haku/w', 'the ECC project', 'some.method()', 'whenever']) {
+  // the repository's previous name (built from parts: tests/repo-name.test.js keeps the literal out of every file)
+  for (const ok of ['haku' + '-harness', '.haku/w', 'the ECC project', 'some.method()', 'whenever']) {
     assert.deepStrictEqual(findOld(ok), [], `false positive: ${ok}`);
   }
 });

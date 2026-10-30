@@ -13,7 +13,7 @@ Status: **0.1.0, GitHub + Linux first.** GitLab and Windows/macOS verification a
 ## Install (two lines, once)
 
 ```
-/plugin marketplace add https://github.com/<owner>/haku-harness.git
+/plugin marketplace add https://github.com/<owner>/haku.git
 /plugin install haku@haku
 ```
 

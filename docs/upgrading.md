@@ -9,7 +9,7 @@ The project was first published as `ecc-harness` (0.1.x - 0.2.x) and is now **ha
    ```
    claude plugin uninstall ecc-harness@ecc-harness
    claude plugin marketplace remove ecc-harness
-   claude plugin marketplace add https://github.com/<owner>/haku-harness.git
+   claude plugin marketplace add https://github.com/<owner>/haku.git
    claude plugin install haku@haku
    ```
 
