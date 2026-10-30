@@ -93,7 +93,7 @@ test('the first section is the at-a-glance section in both parts, in plain words
   }
 });
 
-test('the decision list is last, numbered the same in both parts; 1-5 are decided, 6-8 are open with a recommendation', () => {
+test('the decision list is last, numbered the same in both parts; 1-5 and 7 are decided, 6 and 8 are open with a recommendation', () => {
   const ids = {};
   const DECIDED = { ko: /^- 상태: \*\*확정된 결정\*\*/m, en: /^- Status: \*\*Decided\*\*/m };
   const OPEN = { ko: /^- 상태: \*\*열린 결정\*\*/m, en: /^- Status: \*\*Open\*\*/m };
@@ -112,7 +112,7 @@ test('the decision list is last, numbered the same in both parts; 1-5 are decide
       for (const re of PLAIN[k]) assert.match(b, re, k + ': plain line and example in ' + name);
       assert.match(b, L.question, k + ': question line in ' + name);
       assert.match(b, L.options, k + ': options a and b in ' + name);
-      if (i < 5) {
+      if (i < 5 || i === 6) {
         assert.match(b, DECIDED[k], k + ': decided marker in ' + name);
         assert.doesNotMatch(b, OPEN[k], k + ': not open ' + name);
         assert.match(b, ANSWER[k], k + ': decided answer in ' + name);
@@ -128,19 +128,36 @@ test('the decision list is last, numbered the same in both parts; 1-5 are decide
   assert.deepStrictEqual(ids.ko, ids.ko.map((_, i) => i + 1));
 });
 
-test('the unverified items are marked as open points in both languages', () => {
-  assert.match(part('한국어'), /stop_hook_active[^\n]*미확인/);
-  assert.match(part('English'), /stop_hook_active[^\n]*unverified/);
-  assert.match(part('한국어'), /승인 절차[^\n]*미확인/);
-  assert.match(part('English'), /approval step[^\n]*\(\*\*unverified\*\*\)/);
+test('the three checked items state the confirmed facts and keep the remainder marked unverified', () => {
+  const ko = part('한국어'), en = part('English');
+  // confirmed: Stop loop prevention and the cap, the exact off switches, the dated source
+  for (const [k, p] of [['ko', ko], ['en', en]]) {
+    assert.match(p, k === 'ko' ? /stop_hook_active[^\n]*연속 8번/ : /stop_hook_active[^\n]*8 blocks in a row/, k + ': stop_hook_active with the cap of 8 in a row');
+    for (const w of ['claude plugin disable <', 'enabledPlugins', 'disableAllHooks', '/plugin', '--bare', 'defaultEnabled', '2026-10-30']) assert.ok(p.includes(w), `${k}: missing ${w}`);
+  }
+  assert.match(en, /per the docs read on 2026-10-30/);
+  // still unverified, with the reason
+  assert.match(ko, /승인 절차[^\n]*미확인/);
+  assert.match(en, /approval step[^\n]*\(\*\*unverified\*\*\)/);
+  assert.match(ko, /서술이 없다[^\n]*없다[^\n]*아닙니다/);
+  assert.match(en, /not described[^\n]*does not exist/);
+  assert.match(ko, /신뢰 전에 도는지는 서술이 없습니다\(미확인\)/);
+  assert.match(en, /before trust is not described \(unverified\)/);
+  assert.match(ko, /같은 세션[^\n]*미확인|미확인[^\n]*같은 세션/);
+  assert.match(en, /same session[^\n]*unverified|unverified[^\n]*same session/);
+  // consequences: the -p risk and the Stop hook stays unused
+  assert.match(ko, /\*\*자동 실행에는 확인 단계가 없음\*\*[^\n]*`-p`/);
+  assert.match(en, /\*\*No confirmation step in automated runs\*\*[^\n]*`-p`/);
+  assert.match(ko, /훅 D는 Stop을 쓰지 않습니다/);
+  assert.match(en, /hook D (still )?does not use Stop/);
 });
 
-test('the version files agree and are at least 0.16.9', () => {
+test('the version files agree and are at least 0.16.10', () => {
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   const market = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.ok(Array.isArray(market.plugins) && market.plugins.length >= 1);
   const versions = [plugin.version, ...market.plugins.map(p => p.version)];
   for (const v of versions) assert.strictEqual(v, plugin.version);
   const [a, b, c] = plugin.version.split('.').map(Number);
-  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 9), `version ${plugin.version} is older than 0.16.9`);
+  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 10), `version ${plugin.version} is older than 0.16.10`);
 });

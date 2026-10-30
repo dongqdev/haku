@@ -2,7 +2,7 @@
 
 ## 한국어
 
-**상태**: 설계 초안입니다(결정 1~5는 확정, 6~8은 열림). 구현이 아닙니다. 사용자가 이 문서를 승인한 뒤에 구현을 새 계획으로 세웁니다. 출처는 `docs/ideas-from-others.md`의 후보 1(훅 안전망)과 후보 13(교정 자동 감지)입니다. Claude Code 훅의 동작은 2026-10-30에 공식 문서에서 읽은 내용입니다(요약기를 거쳤으므로 원문 확인이 필요합니다). 확인하지 못한 것은 "미확인"으로 적었습니다.
+**상태**: 설계 초안입니다(결정 1~5와 7은 확정, 6과 8은 열림). 구현이 아닙니다. 사용자가 이 문서를 승인한 뒤에 구현을 새 계획으로 세웁니다. 출처는 `docs/ideas-from-others.md`의 후보 1(훅 안전망)과 후보 13(교정 자동 감지)입니다. Claude Code 훅의 동작은 2026-10-30에 읽은 공식 문서 기준입니다(요약기를 거쳤으므로 원문과 글자까지 같다고 보증하지 못합니다). 확인하지 못한 것은 "미확인"으로 적었습니다.
 
 ### 한눈에 보기
 
@@ -33,13 +33,15 @@
 
 **fail open과 fail closed란?** 경비가 갑자기 아파서 판단을 못 할 때 문을 어떻게 할지입니다. fail open은 문을 열어 둡니다. 안전은 줄지만 일은 계속됩니다. fail closed는 문을 잠급니다. 안전하지만 일이 멈춥니다. 예: 범위 검사 훅이 고장 나면 열어 둡니다(잘못 막으면 일이 멈추므로). 푸시 차단 훅은 워커 세션임을 확인한 뒤에만 잠급니다(되돌릴 수 없는 행동이므로).
 
-**아직 확인하지 못한 세 가지 (미확인)**
+**전에 미확인이던 세 가지, 확인한 결과**
 
-- (가) Stop 훅의 무한 반복 막는 법: Stop 훅은 Claude가 끝내려 할 때 도는 훅입니다. 여기서 "계속 일해"라고 답하면 Claude가 끝나지 않을 수 있습니다. 이를 막는 방법(`stop_hook_active`)의 원문을 읽지 못했습니다. 중요한 이유는 모르고 쓰면 Claude가 멈추지 않기 때문입니다. 그래서 확인하기 전에는 Stop 훅을 쓰지 않습니다.
-- (나) 플러그인 훅을 처음 켤 때 사용자에게 묻는지: 플러그인에 훅이 들어 있을 때 "이 훅을 돌려도 되나요?"라고 한 번 물어보는지 모릅니다. 중요한 이유는 묻지 않으면 모르는 사이에 모든 프로젝트에서 훅이 돌기 때문입니다.
-- (다) 플러그인의 훅을 끄는 정확한 명령: 문제가 생겼을 때 어떻게 끄는지 정확한 명령을 모릅니다. 중요한 이유는 훅이 일을 막을 때 빨리 끌 수 있어야 하기 때문입니다.
+2026-10-30에 읽은 공식 문서 기준입니다. 세 가지를 확인했고, 확인하지 못한 나머지는 아래에 "미확인"으로 남겼습니다.
 
-세 가지 모두 공식 문서 원문을 읽으면 되는 작은 일이며, 만들기 전에 먼저 해 두자는 것이 결정 7입니다.
+- (가) Stop 훅의 무한 반복 막는 법(확인함): Stop 훅은 Claude가 끝내려 할 때 도는 훅입니다. 입력의 `stop_hook_active`가 true이면 "이미 Stop 훅 때문에 계속 일하는 중"이라는 뜻입니다. 공식 방지책은 이 값이 true일 때 일찍 종료 코드 0으로 끝내는 것입니다. 또 연속 8번 막으면 Claude Code가 다음 차단을 무시하고 턴을 끝냅니다(도구를 한 번 부르면 횟수가 0으로 돌아갑니다). 그러니 Stop 훅은 영원히 돌지는 않습니다. 그래도 훅 D는 Stop을 쓰지 않습니다. 8번의 헛수고는 낭비이고, 이 일에는 Stop이 필요하지 않기 때문입니다.
+- (나) 플러그인 훅을 처음 켤 때 사용자에게 묻는지(대부분 미확인): 플러그인 훅 전용 "이 훅을 돌려도 되나요?" 첫 실행 승인 대화상자는 어느 페이지에도 서술이 없습니다. "서술이 없다"는 뜻이지 "없다"는 뜻이 아닙니다(**미확인**). 확인한 것은 이만큼입니다. 플러그인을 설치하면 바로 켜집니다(매니페스트나 마켓플레이스 항목이 `defaultEnabled: false`가 아닌 한). 설치 화면은 훅이 들어 있다고 보여 주고 검토를 권합니다. 그 안내가 전부이고, 피할 수 없습니다. 설정 파일의 훅은 대화형 세션에서 폴더 신뢰 대화상자를 수락하기 전까지 보류됩니다. `-p`와 SDK 세션은 대화상자 없이 폴더를 신뢰로 칩니다. 마켓플레이스에서 설치한 일반 플러그인의 훅이 이 신뢰 대화상자 전에 도는지는 서술이 없습니다(**미확인**).
+- (다) 플러그인의 훅을 끄는 정확한 명령(확인함, 일부 미확인): 플러그인 전체는 `claude plugin disable <이름>@<마켓플레이스>`, `/plugin` 메뉴, `enabledPlugins` 설정으로 끕니다. 모든 훅은 `disableAllHooks: true`로 끕니다. 플러그인의 훅만 따로 끄는 방법은 없습니다. 플러그인 전체나 훅 전부만 됩니다. 미확인: `claude plugin disable` 직후 같은 세션에서 훅이 바로 멈추는지는 확인하지 못했습니다(`/reload-plugins`가 필요하다는 서술만 있습니다).
+
+확인 결과가 설계에 미친 영향은 1절, 2절, 3절, 6절에 적었습니다. 이 확인을 먼저 하자는 것이 결정 7이었고, 끝났습니다.
 
 ### 1. 전제와 현재 상태
 
@@ -52,6 +54,9 @@
   - 종료 코드 2만 막습니다. 1을 포함한 다른 0이 아닌 코드는 "비차단 오류"이고 동작은 그대로 진행됩니다. 즉 기본이 fail open입니다.
   - fail closed로 바꾸려면 훅 설정에 `"onFailure": "block"`(v2.1.295 이상)을 쓰거나, 스크립트가 스스로 2로 끝나야 합니다. `onFailure`는 Stop 등 일부 이벤트에는 효과가 없습니다.
   - 플러그인 훅(`hooks/hooks.json`)은 플러그인이 켜진 모든 세션과 프로젝트에서 돕니다. 스킬을 쓰기를 기다리지 않습니다.
+  - 플러그인을 설치하면 훅도 바로 켜집니다. 설치 화면의 안내 말고 따로 묻는 단계는 서술이 없습니다. 이것은 피할 수 없습니다. 그래서 haku 훅을 선택 설치로, 저장소 로컬로 두는 쪽(결정 1)이 맞습니다.
+  - Stop 훅은 `stop_hook_active`가 true이면 일찍 0으로 끝내는 것이 공식 방지책이고, 연속 8번 막으면 Claude Code가 다음 차단을 무시합니다.
+  - `-p`와 SDK 세션은 폴더 신뢰 대화상자를 보이지 않고 신뢰로 칩니다. 자동 실행에서는 사람이 확인하는 단계가 없습니다.
   - 입력은 표준입력의 JSON입니다(`session_id`, `transcript_path`, `cwd`, `hook_event_name`, 도구 이벤트는 `tool_name`, `tool_input`). 환경변수 `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, `CLAUDE_PROJECT_DIR`가 있습니다.
   - 훅은 "비밀을 디스크에서 지키는 수단"이 아닙니다. 막힌 프롬프트도 로컬에 저장됩니다. 강한 허용·거부는 권한 설정이 맡고, 훅은 보조입니다.
 
@@ -71,7 +76,7 @@
 - **A는 확정된 위반만 막고, 읽지 못하면 통과시킵니다.** 범위 파일이 없거나 형식을 못 읽으면 막을 근거가 없습니다. 잘못 막으면 일이 멈춥니다. 최종 방어선은 지금처럼 병합 단계의 범위 검사입니다. 훅은 "빨리 알리는" 층입니다. 범위는 워커가 시작할 때 선언한 값을 써야 합니다(`worker.js`가 같은 이유로 시작 시점의 값을 씁니다). 이슈를 나중에 고쳐 범위를 넓히는 길을 훅이 열어 주면 안 됩니다.
 - **B는 되돌릴 수 없는 행동이라 닫힘이 맞습니다.** 다만 Bash 매처는 모든 명령에 붙습니다. `onFailure: block`을 설정에 걸면 훅이 죽을 때 모든 Bash가 막힙니다. 그래서 설정에는 걸지 않고, 스크립트가 (1) haku 워커 세션인지 판별하고 (2) 판별 단계의 오류는 통과시키고 (3) 워커 세션이 확인된 뒤 명령을 못 읽으면 스스로 2로 끝납니다. 이 "판별 후에만 닫힘" 규칙이 핵심입니다.
 - **C는 막지 않습니다.** `weaken.js`가 이미 "경고 목록이지 차단이 아니다. 차단이 고장 나면 사람이 갇힌다"는 원칙을 씁니다. 같은 원칙을 지킵니다. 패턴 목록은 `weaken.js`를 그대로 가져다 씁니다(복사하지 않음).
-- **D는 항상 열립니다.** SessionEnd의 예산은 약 1.5초라 오래 걸리면 어차피 끊깁니다. 수집이 세션 종료를 막거나 늦추면 안 됩니다. Stop 이벤트는 쓰지 않습니다. 종료 코드 2가 Claude를 계속 일하게 만들기 때문이고, 무한 반복 방지 방법(`stop_hook_active`)은 이번 조사에서 본문을 읽지 못했습니다(**미확인**).
+- **D는 항상 열립니다.** SessionEnd의 예산은 약 1.5초라 오래 걸리면 어차피 끊깁니다. 수집이 세션 종료를 막거나 늦추면 안 됩니다. Stop 이벤트는 쓰지 않습니다. 종료 코드 2가 Claude를 계속 일하게 만들기 때문입니다. 방지책은 확인했습니다(2026-10-30에 읽은 공식 문서 기준): `stop_hook_active`가 true면 일찍 0으로 끝내고, 연속 8번 막으면 Claude Code가 다음 차단을 무시합니다. 이 상한 덕분에 Stop 훅을 써도 영원히 멈추지 않는 일은 없습니다. 그래도 쓰지 않습니다. 8번의 헛수고를 겪을 수 있고, 세션 종료 수집에는 SessionEnd로 충분하기 때문입니다.
 
 훅은 보안 경계가 아닙니다. 복합 명령, 설정 덮어쓰기 옵션, 별칭, 다른 도구로 돌아가는 길이 있습니다. 진짜 차단은 브랜치 보호와 권한 설정이 맡고(`issues.js branch-protection`), 훅은 실수를 줄이는 층입니다. 문서와 안내에서도 그렇게 말합니다.
 
@@ -81,11 +86,13 @@
 |---|---|---|---|
 | 위치 | 플러그인 루트 | 저장소의 `.claude/settings.local.json`(커밋 안 함) 또는 `.claude/settings.json`(공유) | `/haku:setup`이 사용자 동의 후 위 로컬 설정에 훅 항목을 씀 |
 | 영향 범위 | haku가 전역 설치돼 있으므로 이 컴퓨터의 모든 세션, 모든 프로젝트. 매 도구 호출마다 Node 프로세스가 뜹니다. | 그 저장소만. 공유 파일이면 팀 전원. | 동의한 저장소만 |
-| 끄는 방법 | 플러그인 비활성화(미확인: 정확한 명령). 설정의 `disableAllHooks: true`는 훅 전부를 끕니다. 훅 하나만 끄는 방법은 없다고 문서에 적혀 있습니다. | 항목을 지우거나 `disableAllHooks`. 로컬 파일은 지우면 끝. | 같음. `setup`이 끄는 절차도 보여 줌 |
+| 끄는 방법 | 플러그인 전체를 끕니다: `claude plugin disable <이름>@<마켓플레이스>`, `/plugin` 메뉴(Installed 탭), 설정의 `enabledPlugins`. 훅 전부를 끄려면 설정의 `disableAllHooks: true`. 훅 하나만 끄는 방법은 없습니다. 같은 세션에서 바로 멈추는지는 미확인입니다(`/reload-plugins`가 필요하다는 서술만 있음). | 항목을 지우거나 `disableAllHooks`. 로컬 파일은 지우면 끝. | 같음. `setup`이 끄는 절차도 보여 줌 |
 | 업데이트 | 플러그인 업데이트로 자동 반영 | 수동 | 수동. `setup`을 다시 돌림 |
 | 위험 | haku를 쓰지 않는 프로젝트에도 닿습니다. no-op 판별이 틀리면 남의 작업을 막습니다. | 파일이 어긋나면 훅이 낡은 상태로 남습니다. | 켜지 않은 사람은 보호가 없습니다. |
 
-- 플러그인 훅의 승인 절차(처음 켤 때 사용자에게 묻는지)는 문서에서 찾지 못했습니다(**미확인**). 검색 요약에는 "폴더 신뢰 대화상자가 수락될 때까지 훅이 보류된다"는 말이 있으나 본문이 아니라 확인하지 못했습니다.
+- 플러그인 훅 전용 승인 절차(처음 켤 때 사용자에게 묻는지)는 2026-10-30에 읽은 공식 문서 어디에도 서술이 없습니다(**미확인**). "서술이 없다"는 뜻이지 "없다"는 뜻이 아닙니다. 확인된 것은 설치하면 바로 켜지고 설치 화면이 훅 존재를 알리는 것뿐입니다. 폴더 신뢰 대화상자 전까지 훅이 보류된다는 서술은 설정 파일의 훅에 대한 것입니다. 일반 마켓플레이스 플러그인의 훅이 신뢰 전에 도는지는 서술이 없습니다(미확인).
+- 선택 설치(저장소 로컬)에서도 `-p`와 SDK 세션은 폴더를 신뢰로 치므로 대화상자가 없습니다. 훅이 켜진 저장소에서 자동 실행을 돌리면 사람의 확인 없이 훅이 돕니다.
+- 훅 전부를 한 번만 끄려면 `--settings`로 `disableAllHooks`를 주고, `-p`에서 훅과 플러그인을 아예 읽지 않으려면 `--bare`를 씁니다.
 - **확정(결정 1)**: 처음에는 선택 설치(저장소 로컬 `settings.local.json`)만 씁니다. 범위가 가장 작고, 끄기가 쉽고, `setup`의 "전역은 따로 묻는다" 규칙과 맞습니다. 플러그인 `hooks.json`은 시범에서 오탐이 없다고 확인된 뒤 다시 결정합니다.
 - 어느 쪽이든 훅 스크립트는 `${CLAUDE_PLUGIN_ROOT}`에서 실행하되 상태는 그곳에 쓰지 않습니다(업데이트 때 경로가 바뀝니다). 상태는 `${CLAUDE_PLUGIN_DATA}`에 둡니다.
 - `.claude/` 설정을 고치는 일은 워커 범위 밖입니다. 설치는 오케스트레이터가 사용자 동의를 받아 합니다.
@@ -141,14 +148,16 @@
 6. **수집이 비밀을 모음**: 걸러내기 규칙에 빈틈이 있으면 비밀이 디스크에 남습니다. 대응: 통째 버리기, 300자 제한, 30일 보존, 한 명령 삭제, 꺼진 기본값.
 7. **오탐으로 잘못된 규칙이 쌓임**: 사용자 확인 없이 학습되지 않게 합니다(4절 2~3).
 8. **느려짐**: 모든 도구 호출마다 Node가 뜹니다. 대응: 매처를 좁히고, 판별을 맨 앞에서 하고, 시간 제한을 짧게 둡니다.
-9. **Stop 반복**: Stop 훅을 쓰면 계속 일하게 만들 수 있습니다. 그래서 쓰지 않습니다. 방지법을 확인하기 전에는 도입하지 않습니다.
+9. **Stop 반복**: Stop 훅을 쓰면 계속 일하게 만들 수 있습니다. 방지책(`stop_hook_active` 확인)과 연속 8번 상한은 확인했습니다. 그래도 훅 D는 Stop을 쓰지 않습니다. 이후 Stop 훅이 필요해지면 `stop_hook_active`를 먼저 확인하도록 만들고 새 설계로 다시 검토합니다.
 10. **업데이트 중 경로 변경**: `CLAUDE_PLUGIN_ROOT`가 바뀝니다. 상태를 거기에 쓰지 않습니다.
+11. **자동 실행에는 확인 단계가 없음**: `-p`와 SDK 세션은 폴더 신뢰 대화상자 없이 신뢰로 칩니다. 훅이 켜진 저장소에서 자동 실행을 돌리면 사람이 보지 않는 채로 훅이 돕니다. 대응: 훅은 기록 위주로 두고, 막는 훅은 판별 후에만 닫으며, 끄는 스위치(`disableAllHooks`, `--bare`)를 문서에 적습니다.
+12. **설치만 해도 켜짐**: 플러그인을 설치하면 훅도 바로 켜지고 설치 화면의 안내가 전부입니다. 대응: 플러그인 `hooks.json`을 보내지 않고 선택 설치와 저장소 로컬을 유지합니다(결정 1). 보내게 되면 7단계에서 이 점을 다시 따집니다.
 
 ### 7. 단계별 도입 순서
 
 각 단계는 별도 이슈와 PR이며, 앞 단계의 결과를 보고 다음으로 갑니다.
 
-1. **0단계**: 이 문서를 사용자가 승인하고, 미확인 항목(Stop 반복 방지, 플러그인 훅 승인 절차, 플러그인 끄기 명령)을 원문에서 확인합니다.
+1. **0단계**: 이 문서를 사용자가 승인합니다. 미확인 세 가지(Stop 반복 방지, 플러그인 훅 승인 절차, 플러그인 끄기 명령)는 2026-10-30에 읽은 공식 문서로 확인을 마쳤습니다. 남은 미확인은 플러그인 훅 전용 첫 실행 승인의 유무, 일반 플러그인 훅과 폴더 신뢰의 순서, `claude plugin disable`의 같은 세션 즉시 효과입니다. 1단계의 실환경 확인에서 이 셋을 실제로 시험합니다.
 2. **1단계**: 공용 함수(haku 저장소 판별, 경로 정규화)와 훅 A를 "기록만 하는 모드"로 시범 설치합니다. 선택 설치 한 저장소에서 오탐 수를 봅니다.
 3. **2단계**: 훅 A를 막는 모드로 올립니다. 오탐이 없을 때만.
 4. **3단계**: 훅 C(약화 경고). 위험이 가장 낮습니다.
@@ -159,7 +168,7 @@
 
 ### 8. 사용자가 고를 결정 목록
 
-결정 1~5는 사용자가 이미 고른 **확정된 결정**입니다. 다시 묻지 않습니다. 결정 6~8만 **열린 결정**입니다. 열린 결정은 선택지 질문으로 그대로 쓸 수 있게 적었고, 권장안이 첫 번째입니다.
+결정 1~5와 7은 **확정된 결정**입니다. 다시 묻지 않습니다. 결정 7은 확인을 마쳐서 확정으로 바꿨습니다. 결정 6과 8만 **열린 결정**입니다. 열린 결정은 선택지 질문으로 그대로 쓸 수 있게 적었고, 권장안이 첫 번째입니다.
 
 #### 결정 1. 훅을 어디에 둘까
 
@@ -223,13 +232,13 @@
 
 #### 결정 7. 미확인 항목을 먼저 확인할까
 
-- 상태: **열린 결정**
-- 쉬운 설명: 1절의 "미확인 세 가지"를 짓기 전에 작은 일로 먼저 확인할지, 해당 훅을 만들 때 확인할지 정하는 일입니다.
+- 상태: **확정된 결정** (확인 완료)
+- 쉬운 설명: 한눈에 보기의 "미확인 세 가지"를 짓기 전에 작은 일로 먼저 확인할지, 해당 훅을 만들 때 확인할지 정하는 일이었습니다.
 - 예: Stop 훅의 무한 반복을 막는 법을 모른 채 Stop 훅을 만들면 Claude가 멈추지 않을 수 있습니다. 먼저 원문에서 읽어 두면 그런 일을 피합니다.
 - 질문: Stop 반복 방지, 플러그인 훅 승인 절차, 플러그인 끄기 명령을 구현 전에 원문에서 확인할까요?
-- 선택지: (a) 0단계에서 먼저 확인 (Recommended), (b) 해당 훅을 만들 때 확인
+- 선택지: (a) 0단계에서 먼저 확인 (확정, 완료), (b) 해당 훅을 만들 때 확인
 - 달라지는 것: (a)는 설계가 바뀔 가능성을 앞에서 줄입니다. (b)는 시작이 빠릅니다.
-- 권장: (a). 확인은 짧은 일이고, 결과에 따라 이후 단계가 바뀔 수 있습니다.
+- 확정된 답: (a). 2026-10-30에 읽은 공식 문서로 세 가지를 확인했습니다. 남은 미확인: 플러그인 훅 전용 첫 실행 승인이 있는지(서술 없음), 일반 마켓플레이스 플러그인의 훅이 폴더 신뢰 대화상자 전에 도는지(서술 없음), `claude plugin disable` 직후 같은 세션에서 훅이 바로 멈추는지, 플러그인의 훅 하나만 끄는 방법(없음, 플러그인 전체나 훅 전부만 가능). 이 항목은 1단계의 실환경 확인에서 시험합니다.
 
 #### 결정 8. 이 설계를 승인하고 구현 계획을 세울까
 
@@ -239,11 +248,11 @@
 - 질문: 이 문서를 승인하고 7절의 순서로 구현 계획을 세울까요?
 - 선택지: (a) 승인, 1단계부터 계획 (Recommended), (b) 수정 후 다시 검토, (c) 보류
 - 달라지는 것: (a)는 새 계획과 이슈가 만들어집니다. (b)(c)는 코드 변경이 없습니다.
-- 권장: (a). 단 결정 6~7을 먼저 고른 뒤.
+- 권장: (a). 단 결정 6을 먼저 고른 뒤.
 
 ## English
 
-**Status**: a design draft (decisions 1 to 5 decided, 6 to 8 open), not an implementation. After the user approves this document, the implementation is planned as a new plan. The sources are candidate 1 (hook safety net) and candidate 13 (automatic correction capture) in `docs/ideas-from-others.md`. Claude Code hook behavior is what the official docs said when read on 2026-10-30 (the text passed a summarizer, so check the original). Whatever could not be confirmed is marked "unverified".
+**Status**: a design draft (decisions 1 to 5 and 7 decided, 6 and 8 open), not an implementation. After the user approves this document, the implementation is planned as a new plan. The sources are candidate 1 (hook safety net) and candidate 13 (automatic correction capture) in `docs/ideas-from-others.md`. Claude Code hook behavior is per the docs read on 2026-10-30 (the text passed a summarizer, so it cannot be guaranteed to match the original word for word). Whatever could not be confirmed is marked "unverified".
 
 ### At a glance
 
@@ -274,13 +283,15 @@
 
 **What are fail open and fail closed?** They say what the door does when the guard suddenly falls ill and cannot decide. Fail open leaves the door open: less safe, but work goes on. Fail closed locks the door: safe, but work stops. Example: if the scope-check hook breaks, the door stays open (a wrong block would stop the work). The push-block hook locks the door only after it has confirmed this is a worker session (because a push cannot be undone).
 
-**Three things not yet confirmed (unverified)**
+**The three things that were unverified, and what the check found**
 
-- (a) How to stop a Stop hook from looping forever: a Stop hook runs when Claude is about to finish. If it answers "keep working", Claude may never finish. The original page about the way to prevent this (`stop_hook_active`) was not read. It matters because without it Claude may not stop, so no Stop hook is used until this is confirmed.
-- (b) Whether the user is asked once before a plugin's hook is allowed to run: it is not known whether Claude Code asks "may this hook run?" when a plugin ships hooks. It matters because without a question, hooks would start running in every project without anyone noticing.
-- (c) The exact command to turn a plugin's hooks off: the exact command is not known. It matters because when a hook blocks work, it must be possible to turn it off quickly.
+This is per the docs read on 2026-10-30. The three were checked. What could not be confirmed stays marked "unverified" below.
 
-All three are small jobs: read the official pages. Decision 7 is about doing them before building.
+- (a) How to stop a Stop hook from looping forever (checked): a Stop hook runs when Claude is about to finish. In its input, `stop_hook_active` set to true means "Claude is already continuing because of a stop hook". The official prevention is to exit early with code 0 when it is true. Also, after 8 blocks in a row Claude Code ignores the next block and ends the turn (the count resets when Claude calls a tool). So a Stop hook would not loop forever. Even so, hook D does not use Stop: eight wasted rounds are a cost, and this job does not need Stop.
+- (b) Whether the user is asked once before a plugin's hook is allowed to run (mostly unverified): no page describes a first-run "may this hook run?" dialog for plugin hooks. That means "not described", not "does not exist" (**unverified**). What is confirmed: installing a plugin enables it at once (unless the manifest or marketplace entry sets `defaultEnabled: false`). The install screen shows that hooks are included and advises a review. That notice is all there is, and it cannot be avoided. Hooks in settings files are held in an interactive session until the folder trust dialog is accepted. `-p` and SDK sessions treat the folder as trusted without a dialog. Whether the hooks of a normal marketplace plugin run before that trust dialog is not described (**unverified**).
+- (c) The exact command to turn a plugin's hooks off (checked, partly unverified): turn off the whole plugin with `claude plugin disable <name>@<marketplace>`, the `/plugin` menu, or the `enabledPlugins` setting. Turn off all hooks with `disableAllHooks: true`. There is no way to turn off only a plugin's hooks: it is the whole plugin or all hooks. Unverified: whether hooks stop at once in the same session right after `claude plugin disable` (the only statement is that `/reload-plugins` is needed).
+
+The effects of these findings on the design are written in sections 1, 2, 3 and 6. Decision 7 asked to do this check first, and it is done.
 
 ### 1. Premises and current state
 
@@ -293,6 +304,9 @@ All three are small jobs: read the official pages. Decision 7 is about doing the
   - Only exit code 2 blocks. Any other non-zero code, 1 included, is a "non-blocking error" and the action goes ahead. The default is fail open.
   - To fail closed, set `"onFailure": "block"` (v2.1.295 or later) in the hook config, or have the script exit 2 itself. `onFailure` has no effect for some events such as Stop.
   - Plugin hooks (`hooks/hooks.json`) run in every session and project where the plugin is enabled. They do not wait for a skill to be used.
+  - Installing a plugin enables its hooks at once. No separate asking step is described beyond the install-screen notice. This cannot be avoided, which is why keeping haku hooks opt-in and repository-local (decision 1) is right.
+  - For a Stop hook, exiting early with 0 when `stop_hook_active` is true is the official prevention, and after 8 blocks in a row Claude Code ignores the next block.
+  - `-p` and SDK sessions treat the folder as trusted without showing the trust dialog. In automated runs no person confirms anything.
   - Input is JSON on standard input (`session_id`, `transcript_path`, `cwd`, `hook_event_name`; tool events add `tool_name`, `tool_input`). The environment has `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, `CLAUDE_PROJECT_DIR`.
   - A hook is not a way to keep a secret off disk: a blocked prompt is still stored locally. Hard allow and deny belong to the permission settings; hooks are a supplement.
 
@@ -312,7 +326,7 @@ The reasons, one by one.
 - **A blocks only a confirmed violation and lets everything else through.** With no scope file, or one that cannot be read, there is no ground to block, and a wrong block stops the work. The last line of defense stays the merge-time scope check. The hook is the layer that tells early. It must use the scope declared when the worker started (`worker.js` uses the start-time value for the same reason). The hook must not open a path where editing the issue later widens the scope.
 - **B is irreversible, so closed is right.** But the Bash matcher attaches to every command. With `onFailure: block` in the config, a crashing hook would block all Bash. So the config does not set it, and the script (1) decides whether this is a haku worker session, (2) lets errors in that step pass, and (3) once a worker session is confirmed, exits 2 itself if it cannot read the command. "Closed only after detection" is the key rule.
 - **C does not block.** `weaken.js` already states the principle: it is a warning list, never a block, because a broken block locks people out. This design keeps it. The patterns are imported from `weaken.js`, not copied.
-- **D is always open.** The SessionEnd budget is about 1.5 seconds, so a slow hook is cut off anyway. Capture must never block or delay the end of a session. The Stop event is not used: exit 2 there makes Claude keep working, and the loop prevention (`stop_hook_active`) was not read in the page text this time (**unverified**).
+- **D is always open.** The SessionEnd budget is about 1.5 seconds, so a slow hook is cut off anyway. Capture must never block or delay the end of a session. The Stop event is not used: exit 2 there makes Claude keep working. The prevention is confirmed (per the docs read on 2026-10-30): exit early with 0 when `stop_hook_active` is true, and after 8 blocks in a row Claude Code ignores the next block. That cap means a Stop hook would not stop Claude from ever finishing. It is still not used: it could cost eight wasted rounds, and SessionEnd is enough for session-end capture.
 
 Hooks are not a security boundary. Compound commands, config-override options, aliases and other tools all give ways around them. Real blocking belongs to branch protection and permission settings (`issues.js branch-protection`); hooks reduce mistakes. The documentation says so too.
 
@@ -322,11 +336,13 @@ Hooks are not a security boundary. Compound commands, config-override options, a
 |---|---|---|---|
 | Location | plugin root | `.claude/settings.local.json` in the repository (not committed) or `.claude/settings.json` (shared) | `/haku:setup` writes hook entries into the local settings after the user agrees |
 | Blast radius | haku is installed globally, so every session and every project on this computer. A Node process starts at each tool call. | That repository only. If the file is shared, the whole team. | Only the repositories that agreed |
-| How to turn off | Disable the plugin (unverified: the exact command). `disableAllHooks: true` in settings turns off all hooks. The docs say there is no way to disable one hook alone. | Delete the entry or use `disableAllHooks`. A local file is removed by deleting it. | Same. `setup` also shows the turn-off steps |
+| How to turn off | Turn off the whole plugin: `claude plugin disable <name>@<marketplace>`, the `/plugin` menu (Installed tab), or `enabledPlugins` in settings. To turn off all hooks, `disableAllHooks: true` in settings. There is no way to turn off one hook alone. Whether it stops at once in the same session is unverified (the only statement is that `/reload-plugins` is needed). | Delete the entry or use `disableAllHooks`. A local file is removed by deleting it. | Same. `setup` also shows the turn-off steps |
 | Updates | follow plugin updates | manual | manual; run `setup` again |
 | Risk | reaches projects that do not use haku. A wrong no-op check blocks someone else's work. | the file can drift and leave stale hooks | people who do not opt in have no protection |
 
-- Whether plugin hooks need an approval step when first enabled was not found in the docs (**unverified**). A search summary said hooks are held until the folder trust dialog is accepted, but that was not page text and is not confirmed.
+- A plugin-hook-specific approval step when first enabled is not described anywhere in the docs read on 2026-10-30 (**unverified**). That means "not described", not "does not exist". What is confirmed is only that installing enables the plugin at once and the install screen announces the hooks. The statement that hooks are held until the folder trust dialog is accepted is about hooks in settings files. Whether a normal marketplace plugin's hooks run before trust is not described (unverified).
+- With the opt-in repository-local install, `-p` and SDK sessions still treat the folder as trusted and show no dialog. If automation runs in a repository with hooks on, the hooks run without a person confirming.
+- To turn off all hooks for one run, pass `disableAllHooks` with `--settings`; to make `-p` read no hooks and plugins at all, use `--bare`.
 - **Decided (decision 1)**: start with the opt-in install only (repository-local `settings.local.json`). It has the smallest reach, is easy to turn off, and matches the `setup` rule "ask about global changes separately". Decide on the plugin `hooks.json` again after the pilot shows no false positives.
 - In either case the scripts run from `${CLAUDE_PLUGIN_ROOT}` but write no state there (the path changes on update). State goes to `${CLAUDE_PLUGIN_DATA}`.
 - Editing `.claude/` settings is outside a worker's scope. The orchestrator installs after the user agrees.
@@ -382,14 +398,16 @@ Flow of improvement candidates:
 6. **Capture collects secrets**: a gap in the filter leaves a secret on disk. Response: drop whole sentences, 300-character limit, 30-day retention, one-command deletion, off by default.
 7. **False positives pile up wrong rules**: nothing is learned without the user's confirmation (section 4, steps 2 and 3).
 8. **Slowness**: Node starts at every tool call. Response: narrow matchers, detect first, short time limits.
-9. **Stop loops**: a Stop hook can keep Claude working. So none is used. Do not adopt one before the prevention is confirmed.
+9. **Stop loops**: a Stop hook can keep Claude working. The prevention (checking `stop_hook_active`) and the cap of 8 blocks in a row are confirmed. Hook D still does not use Stop. If a Stop hook is needed later, build it to check `stop_hook_active` first and review it in a new design.
 10. **Path change during an update**: `CLAUDE_PLUGIN_ROOT` changes. No state is written there.
+11. **No confirmation step in automated runs**: `-p` and SDK sessions treat the folder as trusted without a dialog. If automation runs in a repository with hooks on, the hooks run with nobody watching. Response: keep hooks record-first, close a blocking hook only after detection, and document the off switches (`disableAllHooks`, `--bare`).
+12. **Installing is enough to turn them on**: installing a plugin enables its hooks at once, and the install-screen notice is all there is. Response: do not ship a plugin `hooks.json`; keep the opt-in, repository-local install (decision 1). If it is ever shipped, stage 7 weighs this again.
 
 ### 7. Staged rollout order
 
 Each stage is its own issue and PR, and the next starts after the result of the previous one is seen.
 
-1. **Stage 0**: the user approves this document, and the unverified items (Stop loop prevention, the plugin hook approval step, the command to disable a plugin) are checked against the original pages.
+1. **Stage 0**: the user approves this document. The three formerly unverified items (Stop loop prevention, the plugin hook approval step, the command to disable a plugin) were checked against the docs read on 2026-10-30. What remains unverified: whether a plugin-hook-specific first-run approval exists, the order of normal plugin hooks and folder trust, and whether `claude plugin disable` takes effect at once in the same session. The real-environment check of stage 1 tests these three.
 2. **Stage 1**: the shared functions (haku repository detection, path normalization) and hook A in "record only" mode, as a pilot in one opted-in repository. Count the false positives.
 3. **Stage 2**: raise hook A to blocking mode, only if there were none.
 4. **Stage 3**: hook C (weakening warning). The lowest risk.
@@ -400,7 +418,7 @@ Each stage is its own issue and PR, and the next starts after the result of the 
 
 ### 8. Decision list for the user
 
-Decisions 1 to 5 are **Decided**: the user already chose them and they are not asked again. Only decisions 6 to 8 are **Open**. The open ones are written so they can be used as choice questions as they are, and the recommendation is the first option.
+Decisions 1 to 5 and 7 are **Decided**: they are not asked again. Decision 7 was changed to decided because the check is done. Only decisions 6 and 8 are **Open**. The open ones are written so they can be used as choice questions as they are, and the recommendation is the first option.
 
 #### Decision 1. Where should the hooks live
 
@@ -464,13 +482,13 @@ Decisions 1 to 5 are **Decided**: the user already chose them and they are not a
 
 #### Decision 7. Check the unverified items first
 
-- Status: **Open**
-- Plain version: choose whether to check the "three unverified items" of section 1 as a small job before building, or only when the relevant hook is built.
+- Status: **Decided** (check done)
+- Plain version: choose whether to check the "three unverified items" of the at-a-glance section as a small job before building, or only when the relevant hook is built.
 - Example: if a Stop hook is built without knowing how to stop its endless loop, Claude may never stop working. Reading the original page first avoids that.
 - Question: should Stop loop prevention, the plugin hook approval step and the plugin disable command be checked against the original pages before implementation?
-- Options: (a) check first, in stage 0 (Recommended), (b) check when the relevant hook is built
+- Options: (a) check first, in stage 0 (chosen, done), (b) check when the relevant hook is built
 - What changes: (a) lowers the chance that the design changes later. (b) starts sooner.
-- Recommendation: (a). The check is short, and its result can change the later stages.
+- Decided answer: (a). The three were checked against the docs read on 2026-10-30. Still unverified: whether a plugin-hook-specific first-run approval exists (not described), whether a normal marketplace plugin's hooks run before the folder trust dialog (not described), whether hooks stop at once in the same session after `claude plugin disable`, and disabling only a plugin's hooks (not possible: only the whole plugin or all hooks). These are tested in the real-environment check of stage 1.
 
 #### Decision 8. Approve this design and plan the implementation
 
@@ -480,4 +498,4 @@ Decisions 1 to 5 are **Decided**: the user already chose them and they are not a
 - Question: approve this document and plan the implementation in the order of section 7?
 - Options: (a) approve, plan from stage 1 (Recommended), (b) revise and review again, (c) hold
 - What changes: (a) creates a new plan and issues. (b) and (c) change no code.
-- Recommendation: (a), after decisions 6 and 7 are chosen.
+- Recommendation: (a), after decision 6 is chosen.
