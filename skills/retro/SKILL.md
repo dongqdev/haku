@@ -19,6 +19,8 @@ A retro is about ONE story. `/haku:retro` takes the story number N (and the repo
 
 Read, do not summarize from memory: the worker-summary comments and verification comments on the issues closed since the last retro (`gh issue view <n> --comments`), the review comments on the merged pull requests, and what the user said went wrong or was clumsy in this session. Quote the source (issue or PR number) for every item.
 
+Also read `issues.js corrections list` (correction sentences the user saved by hand during earlier sessions). Show each saved sentence to the user one line at a time with a choice question, the recommended option first: "use as a lesson" or "discard". Only the sentences chosen go through the sort below; the others are not used.
+
 ## 2. Sort
 
 Put each item in exactly one bucket and say why:
@@ -48,5 +50,7 @@ Show every change per file as a diff, with the item it comes from. Ask for appro
 ## 4. Close the loop
 
 For each applied item, leave a comment on its source (issue or PR): "반영됨 → #N". Report what was applied, what was only registered, and what the user declined. Last, write that report as a short Korean summary (only what was applied, registered or declined) to a file and run `issues.js retro-done --story N --file <summary.md> [--repo <owner/repo>]`; this leaves the marker that takes the story off the `issues.js retro-due` list. `--repo` must name the repository the story lives in whenever it is not the current checkout's repository (the retro often runs in the haku clone while the story belongs to a project repository; without `--repo` the marker would land on a different issue with the same number).
+
+Saved correction sentences stay in their file until removed: after the retro, tell the user that `issues.js corrections clear` removes them all (including the discarded ones); entries also drop out by themselves after 30 days.
 
 A story that will not get a retro (closed before this feature existed, or the user declines) is dismissed with `issues.js retro-done --story N --skip --reason "<the user's reason>" --user-approved [--repo <owner/repo>]`, only after the user chose that with a choice question, as with `accept-close`. A story closed as not planned never waits for a retro.
