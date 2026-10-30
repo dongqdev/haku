@@ -22,11 +22,11 @@
 ## 설치
 
 ```
-/plugin marketplace add https://github.com/<owner>/haku.git
+/plugin marketplace add https://github.com/dongqdev/haku.git
 /plugin install haku@haku
 ```
 
-HTTPS 주소를 쓰세요. `owner/repo` 줄임 표기는 SSH로 풀려서, SSH 키가 없으면 비공개 저장소에서 실패합니다.
+HTTPS 주소를 쓰세요. `owner/repo` 줄임 표기는 SSH로 풀려서, SSH 키가 없으면 실패합니다.
 
 ## 사용법
 
@@ -52,7 +52,7 @@ HTTPS 주소를 쓰세요. `owner/repo` 줄임 표기는 SSH로 풀려서, SSH �
 
 Claude Code를 위한 개인용 크로스 플랫폼 하네스입니다. 작업마다 워크트리 워커를 두는 방식, 이슈 기반 조율, 병합 관문의 아이디어는 [ECC](https://github.com/affaan-m/ECC)(MIT)에서 왔고, 코드는 처음부터 새로 썼으며 ECC의 코드를 담고 있지 않습니다.
 작업은 Git 이슈로 관리하고, 계획을 세운 세션이 오케스트레이터가 되어 작업마다 워커 하나를 돌립니다.
-상태: **0.1.0, GitHub와 Linux 우선.** GitLab과 Windows/macOS 검증은 아직 하지 않았습니다.
+상태: GitHub 우선입니다. GitLab은 아직 지원하지 않습니다. 테스트는 Linux, macOS, Windows의 CI에서 돌지만, 실제 사용은 Linux에서만 확인했습니다. 현재 버전은 위의 뱃지를 보세요.
 
 <details>
 <summary>줄바꿈</summary>

@@ -22,11 +22,11 @@
 ## Install
 
 ```
-/plugin marketplace add https://github.com/<owner>/haku.git
+/plugin marketplace add https://github.com/dongqdev/haku.git
 /plugin install haku@haku
 ```
 
-Use the HTTPS URL: the `owner/repo` shorthand resolves to SSH, which fails for private repositories without an SSH key.
+Use the HTTPS URL: the `owner/repo` shorthand resolves to SSH, which fails without an SSH key.
 
 ## Usage
 
@@ -52,7 +52,7 @@ You normally type only these two. `plan` hands a vague goal to `sniff` first and
 
 Personal cross-platform harness for Claude Code. The ideas of per-task worktree workers, issue-based coordination and a merge gate come from [ECC](https://github.com/affaan-m/ECC) (MIT); the code is written from scratch and contains none of ECC's.
 Work is tracked as Git issues; a planning session becomes the orchestrator and runs one worker per task.
-Status: **0.1.0, GitHub + Linux first.** GitLab and Windows/macOS verification are not done yet.
+Status: GitHub first. GitLab is not supported yet. The tests run in CI on Linux, macOS and Windows, but real use has only been checked on Linux. See the badge above for the current version.
 
 <details>
 <summary>Line endings</summary>
