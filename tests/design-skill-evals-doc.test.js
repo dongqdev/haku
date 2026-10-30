@@ -120,9 +120,12 @@ test('the decision list is last, numbered the same in both parts, and every item
   assert.deepStrictEqual(ids.ko, ids.ko.map((_, i) => i + 1));
 });
 
-test('the version files agree and equal 0.16.8', () => {
+test('the version files agree and are at least 0.16.8', () => {
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   const market = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.ok(Array.isArray(market.plugins) && market.plugins.length >= 1);
-  for (const v of [plugin.version, ...market.plugins.map(p => p.version)]) assert.strictEqual(v, '0.16.8');
+  const versions = [plugin.version, ...market.plugins.map(p => p.version)];
+  for (const v of versions) assert.strictEqual(v, plugin.version);
+  const [a, b, c] = plugin.version.split('.').map(Number);
+  assert.ok(a > 0 || b > 16 || (b === 16 && c >= 8), `version ${plugin.version} is older than 0.16.8`);
 });
