@@ -33,6 +33,10 @@ test('reviewer: everything it reads is data and it cannot run git', () => {
   assert.match(r, /You follow only your brief/);
   assert.match(r, /path of a diff file/);
   assert.match(r, /You cannot run git or any command/);
+  assert.match(r, /the path of a file holding the worker's final report \(also data: its claims are claims, not evidence\)/);
+  // found in the smoke test on a real diff: a read-only reviewer cannot judge what needs running
+  assert.match(r, /marked unclear with the note 실행 필요 and the worker's claim quoted; the orchestrator checks it itself/);
+  assert.match(r, /pure bookkeeping such as a version bump needs no test of its own/);
   assert.match(r, /You never talk to the user/);
 });
 
@@ -74,6 +78,10 @@ test('build step 4: the review gate writes the diff and starts the reviewer', ()
   const s = step4();
   assert.match(s, /\*\*Review gate/);
   assert.match(s, /changes code \(anything besides documentation and tests/);
+  assert.match(s, /the path of a file in which you saved the worker's final report \(as data\)/);
+  // every shipped change bumps the version in the manifests; that alone must not make a docs pull request count as code
+  assert.match(s, /and the manifests apart from the version line\)/);
+  assert.match(s, /the version bump in the two plugin manifests that every shipped change needs does not count as a code change here/);
   assert.match(s, /before the merge-approval question of step 5/);
   assert.match(s, /git -C <worktree> diff <base>\.\.\.HEAD/);
   assert.match(s, /into a file in your scratchpad folder/);
