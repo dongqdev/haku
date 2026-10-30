@@ -13,7 +13,7 @@ Claude Code를 위한 개인용 크로스 플랫폼 하네스입니다. 작업�
 ## 설치 (두 줄, 한 번)
 
 ```
-/plugin marketplace add https://github.com/<owner>/haku-harness.git
+/plugin marketplace add https://github.com/<owner>/haku.git
 /plugin install haku@haku
 ```
 

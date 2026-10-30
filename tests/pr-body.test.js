@@ -56,8 +56,8 @@ test('a closing line inside a code fence does not count', () => {
 const withClosing = (extra) => `${filled(3).replace('Closes #3', 'Closes #3')}${extra}\n`;
 
 test('qualified and URL closing references are rejected even for the same repository', () => {
-  assert.match(checkBody(withClosing('Closes dongqdev/haku-harness#9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
-  assert.match(checkBody(withClosing('Closes https://github.com/dongqdev/haku-harness/issues/9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
+  assert.match(checkBody(withClosing('Closes dongqdev/haku#9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
+  assert.match(checkBody(withClosing('Closes https://github.com/dongqdev/haku/issues/9'), 3).problems.join('\n'), /저장소 이름이나 URL/);
 });
 
 test('every section needs Korean prose, not just one of them', () => {

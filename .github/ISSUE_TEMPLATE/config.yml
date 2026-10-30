@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: 보안 문제 제보 / Report a security problem
-    url: https://github.com/dongqdev/haku-harness/security/advisories/new
+    url: https://github.com/dongqdev/haku/security/advisories/new
     about: 보안 문제는 공개 이슈로 올리지 말고 여기로 비공개로 알려 주세요. Please do not open a public issue for a security problem.
