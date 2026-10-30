@@ -115,6 +115,8 @@ Session workers need the `claude` command on `PATH` (set `HAKU_CLAUDE_BIN` to us
 
 A task can choose its own worker mode. `plan` writes `Worker-Mode: session` and a `Worker-Reason:` into a task that needs a tool a subagent does not have (a browser, an MCP server, a real device test); every other task stays a subagent. `issues.js worker-mode --issue N` prints the mode a task runs in: the task's line wins over `workerMode` in `.haku/config.json`. A subagent worker has no web tools (`WebSearch`, `WebFetch`, MCP) on purpose, because text from the web is untrusted and the worker can also write files and run commands; it still has `Bash`, which can reach the network, so this lowers the exposure and does not remove it. Facts from the web come from the `researcher` agent, which has only `WebSearch` and `WebFetch` and cannot read the repository. `issues.js research-post` posts its sourced report on the task issue as data (marker first, refused if it looks like it holds a token, key, password or personal path), `issues.js research-show` reads back only reports from the owner, a member or a collaborator, and a session worker is never opened just for web search. A task that chose a session needs the user's yes at launch (`--user-approved`), because a session worker has every tool.
 
+Before a merge approval, a read-only `reviewer` agent (it can only read) checks a pull request that changes code in two stages, spec compliance first and then code quality and safety; a verified critical finding blocks the approval.
+
 </details>
 
 <details>
