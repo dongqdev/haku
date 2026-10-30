@@ -24,8 +24,12 @@ test('no tracked text file still uses the repository\'s previous name', () => {
 });
 
 test('the install lines in the READMEs and the upgrade guide point at the new repository', () => {
-  for (const f of ['README.md', 'README.en.md', 'docs/upgrading.md']) {
+  // the READMEs give the real address (the repository is public, a visitor copies it as it is);
+  // the upgrade guide keeps <owner> because it also speaks to forks
+  for (const f of ['README.md', 'README.en.md']) {
     const text = fs.readFileSync(path.join(root, f), 'utf8');
-    assert.match(text, /plugin marketplace add https:\/\/github\.com\/<owner>\/haku\.git/, f);
+    assert.match(text, /plugin marketplace add https:\/\/github\.com\/dongqdev\/haku\.git/, f);
+    assert.doesNotMatch(text, /<owner>/, `${f}: no placeholder left in the install line`);
   }
+  assert.match(fs.readFileSync(path.join(root, 'docs/upgrading.md'), 'utf8'), /plugin marketplace add https:\/\/github\.com\/<owner>\/haku\.git/);
 });
