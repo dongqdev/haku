@@ -1,27 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="haku, a chihuahua">
-  <rect width="512" height="512" rx="96" fill="#FFF3E0"/>
+  <rect width="512" height="512" rx="96" fill="#F4ECE1"/>
   <!-- ears -->
-  <path d="M96 60 L206 190 L84 250 Z" fill="#C98B4B"/>
-  <path d="M416 60 L306 190 L428 250 Z" fill="#C98B4B"/>
-  <path d="M116 112 L184 190 L108 226 Z" fill="#F4B6A6"/>
-  <path d="M396 112 L328 190 L404 226 Z" fill="#F4B6A6"/>
+  <path d="M62 56 L224 176 L118 266 Q70 192 62 56 Z" fill="#3A241A"/>
+  <path d="M450 56 L288 176 L394 266 Q442 192 450 56 Z" fill="#3A241A"/>
+  <path d="M104 114 L188 178 L130 226 Q108 178 104 114 Z" fill="#E2B27A"/>
+  <path d="M408 114 L324 178 L382 226 Q404 178 408 114 Z" fill="#E2B27A"/>
   <!-- head -->
-  <ellipse cx="256" cy="290" rx="172" ry="158" fill="#E0A862"/>
-  <!-- muzzle -->
-  <ellipse cx="256" cy="352" rx="92" ry="70" fill="#F6DDB5"/>
-  <!-- eyes -->
-  <ellipse cx="190" cy="280" rx="30" ry="36" fill="#2B1B12"/>
-  <ellipse cx="322" cy="280" rx="30" ry="36" fill="#2B1B12"/>
-  <circle cx="200" cy="266" r="11" fill="#FFFFFF"/>
-  <circle cx="332" cy="266" r="11" fill="#FFFFFF"/>
-  <circle cx="182" cy="294" r="5" fill="#FFFFFF"/>
-  <circle cx="314" cy="294" r="5" fill="#FFFFFF"/>
-  <!-- nose and mouth -->
-  <path d="M232 326 Q256 312 280 326 Q276 352 256 356 Q236 352 232 326 Z" fill="#2B1B12"/>
-  <path d="M256 356 L256 378 M256 378 Q238 396 220 384 M256 378 Q274 396 292 384" stroke="#2B1B12" stroke-width="7" fill="none" stroke-linecap="round"/>
-  <!-- tongue -->
-  <path d="M242 390 Q256 440 270 390 Z" fill="#F07F8E"/>
-  <!-- collar -->
-  <path d="M120 430 Q256 490 392 430 L400 470 Q256 530 112 470 Z" fill="#3E7CB1"/>
-  <circle cx="256" cy="486" r="18" fill="#F2C94C"/>
+  <ellipse cx="256" cy="304" rx="170" ry="152" fill="#4A2E20"/>
+  <!-- white blaze flowing into the muzzle -->
+  <path d="M256 156 Q282 206 290 262 Q296 296 316 318 Q346 348 342 386 Q336 438 256 450 Q176 438 170 386 Q166 348 196 318 Q216 296 222 262 Q230 206 256 156 Z" fill="#FBF7F0"/>
+  <!-- tan brow dots (both dogs have them) -->
+  <circle cx="170" cy="240" r="16" fill="#C98B4B"/>
+  <circle cx="342" cy="240" r="16" fill="#C98B4B"/>
+  <!-- eyes and nose -->
+  <circle cx="184" cy="294" r="31" fill="#140C08"/>
+  <circle cx="328" cy="294" r="31" fill="#140C08"/>
+  <circle cx="194" cy="281" r="10" fill="#FFFFFF"/>
+  <circle cx="338" cy="281" r="10" fill="#FFFFFF"/>
+  <path d="M228 352 Q256 334 284 352 Q280 380 256 384 Q232 380 228 352 Z" fill="#140C08"/>
 </svg>

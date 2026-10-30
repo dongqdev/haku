@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/haku.svg" alt="haku, a chihuahua" width="128"></p>
+<p align="center"><img src="assets/haku-lockup.svg" alt="haku, a chihuahua" width="320"></p>
 
 <p align="center"><a href="README.md">한국어</a> | <b>English</b></p>
 
