@@ -9,6 +9,18 @@ const MAX_TITLE = 244;
 
 const KINDS = ['T1', 'T2', 'T3'];
 
+// An unclear point is written into a draft as one of these markers and resolved with the user before anything is
+// published. The Korean marker is matched exactly, the English one case-insensitively. A half-written marker
+// (no closing bracket, or no brackets) is deliberately not a marker.
+const UNRESOLVED_MARKERS = ['[확인 필요]', '[NEEDS CLARIFICATION]'];
+
+// Returns the first marker found in the text, or null.
+function findMarker(text) {
+  if (typeof text !== 'string') return null;
+  const lower = text.toLowerCase();
+  return UNRESOLVED_MARKERS.find(m => lower.includes(m.toLowerCase())) || null;
+}
+
 // A draft is the locally written, user-approved plan:
 // { assignee, sprint?, story:{id,title,body?,verify}, milestones:[{id,title,body?,verify,
 //   tasks:[{id,title,body?,acceptance:[..],verify,scope:[..],dependsOn?:[ids]}]}] }
@@ -51,6 +63,17 @@ function validateDraft(draft) {
   const bodyCheck = (where, node) => {
     if (hasHarnessLine(node.body)) errors.push(`${where}: body must not contain a harness line (Scope:, Worker-Mode:, Depends-On: ...); those are written from the fields`);
   };
+  // Every text that becomes issue text is scanned. A marker inside a code fence or backticks counts too, with no
+  // exception: an example in a draft would reach the issue and confuse a worker.
+  const markerCheck = (where, label, text) => {
+    const m = findMarker(text);
+    if (m) errors.push(`${where}: ${label} still has an unresolved marker ${m}`);
+  };
+  const markerNode = (where, node) => {
+    markerCheck(where, 'title', node.title);
+    markerCheck(where, 'body', node.body);
+    if (node.verify) markerCheck(where, 'verify.profile', node.verify.profile);
+  };
   const uniq = (where, id) => {
     if (!id) errors.push(`${where}: id is required`);
     else if (ids.has(id)) errors.push(`${where}: duplicate id ${id}`);
@@ -61,6 +84,7 @@ function validateDraft(draft) {
   bodyCheck('story', draft.story);
   checkKind('story', draft.story);
   checkVerify('story', draft.story.verify);
+  markerNode('story', draft.story);
 
   const taskIds = new Set();
   for (const m of draft.milestones) {
@@ -70,6 +94,7 @@ function validateDraft(draft) {
     checkVerify(`milestone ${m.id}`, m.verify);
     checkKind(`milestone ${m.id}`, m);
     bodyCheck(`milestone ${m.id}`, m);
+    markerNode(`milestone ${m.id}`, m);
     need(Array.isArray(m.tasks) && m.tasks.length > 0, `milestone ${m.id}: needs at least one task`);
     for (const t of m.tasks || []) {
       const where = `task ${t.id || '?'}`;
@@ -82,6 +107,10 @@ function validateDraft(draft) {
       checkVerify(where, t.verify);
       checkKind(where, t);
       bodyCheck(where, t);
+      markerNode(where, t);
+      (Array.isArray(t.acceptance) ? t.acceptance : []).forEach((a, i) => markerCheck(where, `acceptance[${i}]`, a));
+      (Array.isArray(t.scope) ? t.scope : []).forEach((g, i) => markerCheck(where, `scope[${i}]`, g));
+      markerCheck(where, 'workerReason', t.workerReason);
       if (t.workerMode !== undefined) {
         if (!WORKER_MODES.includes(t.workerMode)) errors.push(`${where}: workerMode must be one of ${WORKER_MODES.join('|')}`);
         else if (t.workerMode === 'session') {
@@ -204,4 +233,4 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   return { ok: true, dryRun: false, plan, errors: [], numbers: Object.fromEntries(numbers) };
 }
 
-module.exports = { validateDraft, flatten, renderBody, publish };
+module.exports = { UNRESOLVED_MARKERS, findMarker, validateDraft, flatten, renderBody, publish };
