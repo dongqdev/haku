@@ -1,6 +1,6 @@
 {
   "name": "haku",
-  "version": "0.16.3",
+  "version": "0.16.4",
   "description": "HAKU - Harness Assistant Keeping Users in the loop. Git-issue driven story planning, orchestrator/worker development and verified merge-to-close for Claude Code (GitHub first, GitLab next).",
   "author": { "name": "dongqdev" },
   "license": "MIT",

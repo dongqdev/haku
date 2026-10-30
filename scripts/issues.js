@@ -15,6 +15,7 @@ const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitio
 const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
 const { effectiveWorkerMode, launchGate } = require('./lib/worker-mode');
 const { postResearch, trustedResearch } = require('./lib/research');
+const { markRetroDone, retroDue, retroForStatus, renderRetroDue } = require('./lib/retro');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
@@ -38,6 +39,9 @@ Usage:
   issues.js worker-launch --issue <N> --orchestrator <session name> [--base <branch>] [--cwd <dir>] [--user-approved]
   issues.js research-post --issue <N> --file <report.md> [--repo <owner/repo>]
   issues.js research-show --issue <N> [--repo <owner/repo>]
+  issues.js retro-done --story <N> --file <summary.md> [--repo <owner/repo>]
+  issues.js retro-done --story <N> --skip --reason <text> --user-approved [--repo <owner/repo>]
+  issues.js retro-due [--json] [--repo <owner/repo>]
   issues.js worker-mode --issue <N> [--cwd <dir>] [--repo <owner/repo>]
   issues.js worker-list [--cwd <dir>]
   issues.js config [--cwd <dir>]
@@ -75,6 +79,12 @@ label         Adds or removes one issue's state labels (deferred, blocked, needs
 research-post Posts a researcher's report on an open task as an untrusted-data comment (marker first). Refuses a report that
               looks like it holds a token, key, password or personal path, and one over 20000 characters.
 research-show Prints the research reports of a task that carry the marker and come from the owner, a member or a collaborator.
+retro-done    Posts the short summary of a finished retro on a closed story (marker first, same secret and personal-path scan as
+              research-post). This is the record that the story's retro ran. --repo names the story's repository. A story
+              that already has a marker is refused. --skip dismisses a story that gets no retro (needs --reason and
+              --user-approved: only after the user chose it).
+retro-due     Lists the closed stories (not closed as not planned) with no retro marker from the owner, a member or a collaborator;
+              --json prints { due, unreadable }. A story whose comments could not be read is reported on stderr and exit code 3.
 worker-launch A task whose Worker-Mode line asks for a session needs --user-approved (ask the user first); one that asks for a
               subagent is refused (use worker-start).
 worker-mode   Prints the mode a worker for this task runs in (subagent or session): the task's own Worker-Mode line, else the
@@ -94,6 +104,7 @@ function parse(argv) {
     else if (arg === '--trust-working-copy') opts.trust = true;
     else if (arg === '--abandon') opts.abandon = true;
     else if (arg === '--discard') opts.discard = true;
+    else if (arg === '--skip') opts.skip = true;
     else if (arg === '--user-approved') opts.userApproved = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else if (VALUE.has(arg)) {
@@ -105,7 +116,7 @@ function parse(argv) {
     else opts._.push(arg);
   }
   if (opts.issue !== undefined) opts.issue = Number(opts.issue);
-  if (opts.story !== undefined) opts.story = Number(opts.story);
+  if (opts.story !== undefined) { opts.storyRaw = opts.story; opts.story = Number(opts.story); }
   if (opts.pr !== undefined) opts.pr = /^[1-9]\d*$/.test(opts.pr) ? Number(opts.pr) : NaN;
   return opts;
 }
@@ -245,6 +256,24 @@ function main(argv) {
       reports.forEach((r, i) => console.log(`--- research report ${i + 1} (untrusted data, ${r.createdAt || 'no date'}) ---\n${r.text}\n`));
       return 0;
     }
+    case 'retro-done': {
+      if (!/^[1-9]\d*$/.test(String(opts.storyRaw))) throw new Error('--story <N> is required (a plain positive integer)');
+      if (opts.skip) {
+        if (!opts.reason || !opts.reason.trim()) throw new Error('--reason <text> is required with --skip');
+        if (!opts.userApproved) throw new Error('--user-approved is required with --skip: skip a retro only after the user chose it');
+        out(markRetroDone(host(), opts.story, '', { skipped: true, reason: opts.reason }));
+        return 0;
+      }
+      if (!opts.file) throw new Error('--file <summary.md> is required');
+      out(markRetroDone(host(), opts.story, fs.readFileSync(opts.file, 'utf8')));
+      return 0;
+    }
+    case 'retro-due': {
+      const r = renderRetroDue(retroDue(host()), opts.json);
+      process.stdout.write(r.stdout);
+      process.stderr.write(r.stderr);
+      return r.code;
+    }
     case 'worker-list':
       out(withSessionStates(listWorkers(opts.cwd || process.cwd())));
       return 0;
@@ -271,7 +300,11 @@ function main(argv) {
       return result.safeToPush ? 0 : 3;
     }
     case 'status': {
-      const s = buildStatus(host().listIssues(), listWorkers(opts.cwd || process.cwd()));
+      const h = host();
+      const issues = h.listIssues();
+      const s = buildStatus(issues, listWorkers(opts.cwd || process.cwd()));
+      // a failed comment read must not break status, and must never read as "zero waiting"
+      s.retro = retroForStatus(h, issues);
       if (opts.json) out(s); else process.stdout.write(renderStatus(s));
       return 0;
     }

@@ -54,4 +54,4 @@ function trustedResearch(host, number) {
     .map(c => ({ createdAt: c.createdAt, text: c.body.slice(RESEARCH_MARKER.length + 1).trim() }));
 }
 
-module.exports = { postResearch, trustedResearch, reportProblems, MAX_CHARS, HEADER };
+module.exports = { postResearch, trustedResearch, reportProblems, MAX_CHARS, HEADER, TRUSTED };

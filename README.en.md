@@ -38,7 +38,7 @@ Then in the repository you want to work on:
 /haku:plan          # goal -> draft -> approval -> issues -> build
 ```
 
-You normally type only these two. `plan` hands a vague goal to `sniff` first and continues into `build` after you approve the plan; type `build` yourself only to resume a story after losing the session. `/haku:sniff` is more than an intake: call it yourself to have an idea or a plan questioned thoroughly. It asks in rounds over a tree of decisions (up to four questions at a time, every one a choice), looks facts up itself, and never lets a branch that touches real money, real data, security or other people's systems pass as an assumption. Anytime: `status` (read-only view of the work), `triage` (sort open issues that belong to no story), `retro` (turn what went wrong into fixes for haku).
+You normally type only these two. `plan` hands a vague goal to `sniff` first and continues into `build` after you approve the plan; type `build` yourself only to resume a story after losing the session. `/haku:sniff` is more than an intake: call it yourself to have an idea or a plan questioned thoroughly. It asks in rounds over a tree of decisions (up to four questions at a time, every one a choice), looks facts up itself, and never lets a branch that touches real money, real data, security or other people's systems pass as an assumption. Anytime: `status` (read-only view of the work), `triage` (sort open issues that belong to no story), `retro` (turn what went wrong into fixes for haku). A story's retro is started when the story ends, and `issues.js retro-due` lists the finished stories still waiting for one.
 
 ## Flow
 
