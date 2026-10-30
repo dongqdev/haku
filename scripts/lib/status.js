@@ -68,6 +68,14 @@ const table = (title, header, rows) => {
   return `${lines.join('\n')}\n`;
 };
 
+// Closed stories still waiting for a retro. Nothing for zero; a failed read says so instead of claiming zero.
+function renderRetro(retro) {
+  if (!retro) return '';
+  if (retro.error) return '\nretro 대기: 확인하지 못함\n';
+  if (!retro.due.length) return '';
+  return `\nretro 대기 ${retro.due.length}개: ${retro.due.map(n => `#${n}`).join(', ')}\n`;
+}
+
 // All five sections are always printed, so an empty section reads as "none", not "cut off".
 function renderStatus(s) {
   return [
@@ -78,7 +86,8 @@ function renderStatus(s) {
     table('마감 미완 (자식은 모두 닫혔는데 부모가 열림)', ['이슈', '종류', '자식 수'], s.incompleteClose.map(x => [`#${x.number} ${x.title}`, x.type, x.children]))
   ].join('\n')
     + (s.unattached.length ? `\n스토리에 속하지 않은 열린 태스크: ${s.unattached.map(n => `#${n}`).join(', ')}\n` : '')
-    + (s.underClosedStory.length ? `\n닫힌 스토리 아래의 열린 태스크: ${s.underClosedStory.map(n => `#${n}`).join(', ')}\n` : '');
+    + (s.underClosedStory.length ? `\n닫힌 스토리 아래의 열린 태스크: ${s.underClosedStory.map(n => `#${n}`).join(', ')}\n` : '')
+    + renderRetro(s.retro);
 }
 
 module.exports = { buildStatus, renderStatus };

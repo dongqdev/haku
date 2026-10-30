@@ -45,4 +45,4 @@ Show every change per file as a diff, with the item it comes from. Ask for appro
 
 ## 4. Close the loop
 
-For each applied item, leave a comment on its source (issue or PR): "반영됨 → #N". Report what was applied, what was only registered, and what the user declined.
+For each applied item, leave a comment on its source (issue or PR): "반영됨 → #N". Report what was applied, what was only registered, and what the user declined. Last, write that report as a short Korean summary (only what was applied, registered or declined) to a file and run `issues.js retro-done --story N --file <summary.md>`; this leaves the marker that takes the story off the `issues.js retro-due` list.
