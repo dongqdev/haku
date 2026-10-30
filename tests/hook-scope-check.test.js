@@ -90,6 +90,21 @@ function failures(script) {
   res = run(script, payload(r, path.join(r, 'src', 'm.js')), { cwd: r, data: inRepo });
   expect('data dir inside the repo is refused', res.status === 0 && !fs.existsSync(inRepo));
 
+  res = run(script, payload(r, path.join(r, 'src', 'k.js')), { cwd: r, data: r });
+  expect('data dir equal to the repo root is refused', res.status === 0 && !fs.existsSync(path.join(r, common.RECORD_FILE)));
+
+  try {
+    const link = path.join(tmp(), 'link');
+    fs.symlinkSync(path.join(r, 'docs'), link);
+    res = run(script, payload(r, path.join(r, 'src', 'l.js')), { cwd: r, data: link });
+    expect('symlink into the repo is refused', res.status === 0 && !fs.existsSync(path.join(r, 'docs', common.RECORD_FILE)));
+  } catch (err) { /* symlinks not available here */ }
+
+  const wide = repo('**');
+  const wdata = tmp();
+  res = run(script, payload(wide, path.join(wide, '.claude', 'settings.json')), { cwd: wide, data: wdata });
+  expect('.claude is outside even when Scope matches', res.status === 0 && records(wdata).length === 1 && records(wdata)[0].file === '.claude/settings.json');
+
   const f = path.join(data, common.RECORD_FILE);
   const line = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : '';
   expect('record holds paths only', line !== '' && !line.includes('SECRET') && Object.keys(JSON.parse(line.split('\n')[0])).sort().join() === 'file,scope,time');
@@ -153,5 +168,13 @@ test('mutation: no input size cap is caught', () => {
 });
 test('mutation: recording prompt content is caught', () => {
   const s = mutant(d => patch(d, 'scripts/lib/hook-common.js', 'scope: entry.scope }', 'scope: entry.scope, content: "SECRET" }'));
+  assert.ok(failures(s).length > 0);
+});
+test('mutation: allowing the repo root as data dir is caught', () => {
+  const s = mutant(d => patch(d, 'scripts/lib/hook-common.js', "d.toLowerCase() === r.toLowerCase() || relativeTo(r, d) !== null", 'relativeTo(r, d) !== null'));
+  assert.ok(failures(s).length > 0);
+});
+test('mutation: not resolving symlinks is caught', () => {
+  const s = mutant(d => patch(d, 'scripts/lib/hook-common.js', 'return path.join(fs.realpathSync(cur), ...tail);', 'return path.join(cur, ...tail);'));
   assert.ok(failures(s).length > 0);
 });

@@ -99,11 +99,34 @@ function readLimited(stream, limit = MAX_INPUT) {
   });
 }
 
+// realpath of `p`, or of its nearest existing parent plus the missing tail; the plain path when nothing resolves.
+function realish(p) {
+  let cur = path.resolve(p);
+  const tail = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync(cur), ...tail);
+    } catch (err) {
+      const up = path.dirname(cur);
+      if (up === cur) return path.resolve(p);
+      tail.unshift(path.basename(cur));
+      cur = up;
+    }
+  }
+}
+
+// True when `dir` is the root itself or lies below it, symlinks resolved on both sides.
+function insideRoot(root, dir) {
+  const r = normalizePath(realish(root));
+  const d = normalizePath(realish(dir));
+  return d.toLowerCase() === r.toLowerCase() || relativeTo(r, d) !== null;
+}
+
 // Append one JSON line with the path only (no prompt text, no tool content). Nothing is written when `dataDir` is
 // empty or lies inside the repository, so a record never ends up in a commit. Returns whether it wrote.
 function recordViolation(dataDir, root, entry) {
   if (!dataDir || typeof dataDir !== 'string') return false;
-  if (relativeTo(root, path.resolve(dataDir)) !== null) return false;
+  if (insideRoot(root, dataDir)) return false;
   fs.mkdirSync(dataDir, { recursive: true });
   const line = JSON.stringify({ time: new Date().toISOString(), file: entry.file, scope: entry.scope }) + '\n';
   fs.appendFileSync(path.join(dataDir, RECORD_FILE), line, { mode: 0o600 });

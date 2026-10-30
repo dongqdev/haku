@@ -33,7 +33,12 @@ where the haku plugin is installed, `${CLAUDE_PLUGIN_ROOT}` is only set for plug
 ```
 
 Records are written only when the environment variable `CLAUDE_PLUGIN_DATA` names a folder. Without it the hook
-records nothing. A folder inside the repository is refused, so a record cannot end up in a commit.
+records nothing. **`CLAUDE_PLUGIN_DATA` is probably not set for a hook you register by hand** in
+`settings.local.json`; only hooks registered by a plugin are expected to get it (unverified). So give it explicitly,
+for example in the `env` block of the same settings file (`"env": { "CLAUDE_PLUGIN_DATA": "/home/you/.haku-data" }`)
+or as a prefix in the command. This is untested in a live session. A folder equal to the repository root or inside
+it (also through a symlink) is refused, so a record cannot end up in a commit. The file lives outside the
+repository, and records of all repositories that use the same folder share one `scope-violations.jsonl`.
 
 ### What is recorded
 
