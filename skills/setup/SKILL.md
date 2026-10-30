@@ -72,6 +72,8 @@ Rules for the apply step:
 
 ## 4. Finish
 
+When the setup pull request waits for the user's merge, give its full address (`gh pr view <n> --json url --jq .url`) in the body, never inside a code block or only as `#<n>`, and say next to it whether the checks passed and whether it can be merged now.
+
 If the repository may become public, mention that `node "${CLAUDE_PLUGIN_ROOT}/scripts/check-personal-paths.js"` finds personal paths (home folders and user names) in tracked files and can be added to its CI.
 
 Report what was set up and what is still pending (for example "the setup PR must be merged before the first task can be verified"). Point to `/haku:plan` as the next step.

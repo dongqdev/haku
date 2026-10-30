@@ -169,9 +169,9 @@ test('the new skills describe their safety rules', () => {
   assert.match(read('triage'), /nothing is closed without the user's confirmation/);
   assert.match(read('triage'), /--reason/);
   assert.match(read('sniff'), /Nothing is created on GitHub and no repository is touched here/);
-  assert.match(read('sniff'), /Ask at most eight questions \*\*in total, counting any asked after the summary\*\*/);
+  assert.match(read('sniff'), /Ask the whole frontier in \*\*one round\*\*: one `AskUserQuestion` call with up to four questions/);
   assert.match(read('sniff'), /At most two revision rounds/);
-  assert.match(read('sniff'), /never beyond the eight-question total/);
+  assert.match(read('sniff'), /run one more round \(at most four questions\)/);
   assert.match(read('plan'), /\.haku\/drafts\/\*\.goal\.md/);
   assert.match(read('plan'), /use exactly that file/);
   assert.match(read('plan'), /never assume the newest is current/);
