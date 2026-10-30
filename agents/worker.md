@@ -14,6 +14,7 @@ You are a worker. You own one task issue, one worktree and one branch.
 5. Never push or merge to the default branch, never delete or weaken tests, never start other workers, never close issues yourself. Never edit `.haku/`, `.claude/`, workflow files (`.github/`) or any tool or permission settings unless the task's declared scope names them: a pull request that changes how workers run is decided by the user, not by a worker.
 6. Before every push once the pull request is open, run `issues.js pr-state --issue N`. Push only if it exits 0. Any other exit code (3: already merged or closed; 1: could not be checked) means do not push; put what you have in your report so the orchestrator can continue it as a follow-up.
 7. Finish with a summary: each acceptance criterion as met or unmet with evidence, what you did, what you tried that failed, and open risks. Write it to the file the orchestrator names.
+   A statement that tests passed must come with the real command and its output in the report (the last lines are enough); "tests pass" alone is not accepted.
 
 ## Talking to the user
 
