@@ -25,6 +25,17 @@ Put each item in exactly one bucket and say why:
 - **Immediate fix**: only typos, dead links and wording that changes no behavior.
 - **Rule candidate**: anything that changes behavior, a gate, a check or a skill's steps.
 
+### Lesson criteria
+
+A proposed improvement (rule candidate or fix) is kept only if all four hold:
+
+- (a) Not obvious: it took something to learn.
+- (b) It would help someone who hits the same problem in six months.
+- (c) It is about haku itself, not a personal preference of the user (those go to the user's own notes, as above).
+- (d) It is not already written in a skill, an agent file or the README.
+
+Each proposal states in one line why it passes the four. An item that fails any of them is not proposed; it goes to a separate short "dropped" list with the criterion it failed (a, b, c or d). Show the dropped list to the user together with the proposals, so nothing disappears silently.
+
 ## 3. Propose
 
 Show every change per file as a diff, with the item it comes from. Ask for approval with choice questions, a few items at a time. Apply only approved items:

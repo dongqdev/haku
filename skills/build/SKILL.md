@@ -63,6 +63,14 @@ Keep the state labels in step with what is really happening, with `issues.js lab
 
 Create it as a comment on the task issue and as a file in the PR description area: prerequisites, numbered steps, the expected value per step, and a results table for the user to fill (measured value, pass/fail, evidence). The comment only records measured values and evidence; the verdict is never read from free text. When the user says the measurement is done, ask the verdict with a choice question (통과 / 실패 / 추가 측정 필요). On "실패" return the recorded results to a worker; on "통과" continue at step 5 (that answer is the merge consent).
 
+## Evidence for every claim of completion
+
+Every claim of completion the orchestrator makes (a task is done, a story is done, ready to merge, verified, CI passed) names its evidence in the same message: the command that was run and its result, or the pull request's check list and the verification record.
+
+- An impression is never evidence. "It looks done" and "the worker said so" are impressions.
+- When the evidence is missing or could not be read, the message says "확인하지 못함" and does not claim completion.
+- The same applies when reporting to another session.
+
 ## Never
 
 - Never close a story or milestone because its children look done - roll-up after verification decides.
