@@ -1,6 +1,8 @@
 'use strict';
 
 const { BASE_LABEL, typeLabel, kindLabel, WORK_KINDS, withPrefix, stripPrefix } = require('./model');
+const { WORKER_MODES } = require('./config');
+const { reasonProblem, hasHarnessLine, isOneLine } = require('./worker-mode');
 
 // GitHub rejects titles over 256 characters; the prefix adds up to 12, so a draft title may use 244.
 const MAX_TITLE = 244;
@@ -34,6 +36,7 @@ function validateDraft(draft) {
       errors.push(`${where}: verify.kind must be one of ${KINDS.join('|')}`);
       return;
     }
+    if (v.profile !== undefined && !isOneLine(v.profile)) errors.push(`${where}: verify.profile must be one plain line`);
     if ((v.kind === 'T1' || v.kind === 'T2') && !v.profile) {
       errors.push(`${where}: verify.profile is required for ${v.kind} (a name defined in .haku/verify.json)`);
     }
@@ -44,6 +47,10 @@ function validateDraft(draft) {
       errors.push(`${where}: kind must be one of ${WORK_KINDS.join('|')}`);
     }
   };
+  // The free text goes above the Harness section; a harness line in it (copied from a stranger's issue, say) must not pass for one.
+  const bodyCheck = (where, node) => {
+    if (hasHarnessLine(node.body)) errors.push(`${where}: body must not contain a harness line (Scope:, Worker-Mode:, Depends-On: ...); those are written from the fields`);
+  };
   const uniq = (where, id) => {
     if (!id) errors.push(`${where}: id is required`);
     else if (ids.has(id)) errors.push(`${where}: duplicate id ${id}`);
@@ -51,6 +58,7 @@ function validateDraft(draft) {
   };
 
   uniq('story', draft.story.id);
+  bodyCheck('story', draft.story);
   checkKind('story', draft.story);
   checkVerify('story', draft.story.verify);
 
@@ -61,6 +69,7 @@ function validateDraft(draft) {
     checkTitle(`milestone ${m.id}`, m.title);
     checkVerify(`milestone ${m.id}`, m.verify);
     checkKind(`milestone ${m.id}`, m);
+    bodyCheck(`milestone ${m.id}`, m);
     need(Array.isArray(m.tasks) && m.tasks.length > 0, `milestone ${m.id}: needs at least one task`);
     for (const t of m.tasks || []) {
       const where = `task ${t.id || '?'}`;
@@ -72,6 +81,16 @@ function validateDraft(draft) {
       need(Array.isArray(t.scope) && t.scope.length > 0, `${where}: scope (files this task may touch) is required`);
       checkVerify(where, t.verify);
       checkKind(where, t);
+      bodyCheck(where, t);
+      if (t.workerMode !== undefined) {
+        if (!WORKER_MODES.includes(t.workerMode)) errors.push(`${where}: workerMode must be one of ${WORKER_MODES.join('|')}`);
+        else if (t.workerMode === 'session') {
+          const bad = reasonProblem(t.workerReason);
+          if (bad) errors.push(`${where}: workerMode session: ${bad}`);
+        } else if (t.workerReason !== undefined) errors.push(`${where}: workerReason only goes with workerMode session`);
+      } else if (t.workerReason !== undefined) errors.push(`${where}: workerReason needs workerMode session`);
+      // Every value that becomes a line of the Harness section must be one plain line, or it could carry another harness line.
+      for (const g of t.scope || []) if (!isOneLine(g)) errors.push(`${where}: a scope entry must be one plain line`);
     }
   }
   for (const m of draft.milestones) {
@@ -125,6 +144,10 @@ function renderBody(entry, numbers, children = []) {
   lines.push(`Verify-Kind: ${node.verify.kind}`);
   if (node.verify.profile) lines.push(`Verify-Profile: ${node.verify.profile}`);
   if (type === 'story' && node.mergeMode) lines.push(`Merge-Mode: ${node.mergeMode}`);
+  if (type === 'task' && node.workerMode) {
+    lines.push(`Worker-Mode: ${node.workerMode}`);
+    if (node.workerMode === 'session') lines.push(`Worker-Reason: ${node.workerReason.trim()}`);
+  }
   if (node.scope) lines.push(`Scope: ${node.scope.join(', ')}`);
   if ((node.dependsOn || []).length) {
     lines.push(`Depends-On: ${node.dependsOn.map(d => `#${numbers.get(d)}`).join(', ')}`);
@@ -145,6 +168,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     key: e.key,
     type: e.type,
     kind: e.node.kind || null,
+    workerMode: e.type === 'task' ? (e.node.workerMode || null) : null,
     title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));

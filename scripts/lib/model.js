@@ -140,6 +140,8 @@ function issueFromBranch(branch) {
 }
 
 const SUMMARY_MARKER = '<!-- haku:worker-summary -->';
+// First line of a research report comment (posted by `issues.js research-post`).
+const RESEARCH_MARKER = '<!-- haku:research -->';
 // Written when the user decides a task was closed on purpose without a merged pull request.
 const ACCEPTED_CLOSE_MARKER = '<!-- haku:accepted-close -->';
 const VERIFIED_PREFIX = '<!-- haku:verified';
@@ -193,6 +195,7 @@ module.exports = {
   issueFromBranch,
   prRefs,
   SUMMARY_MARKER,
+  RESEARCH_MARKER,
   ACCEPTED_CLOSE_MARKER,
   verifiedMarker,
   parseVerifiedMarker,

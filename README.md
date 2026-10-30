@@ -82,6 +82,8 @@ Claude Code는 설치된 플러그인을 **버전**을 키로 하는 캐시에 �
 
 세션 워커에는 `PATH`에 `claude` 명령이 있어야 하고(다른 것을 쓰려면 `HAKU_CLAUDE_BIN`을 설정, Windows에서는 `.cmd` 래퍼가 아니라 `claude.exe`), 대화형 `claude`에서 한 번 신뢰한 저장소여야 하며, 메시지가 전달되도록 오케스트레이터와 같은 Claude 계정이어야 합니다. `issues.js config`는 적용 중인 설정을 출력하고, `issues.js worker-list`는 각 세션 워커의 실시간 상태를 보여 줍니다. 상태가 `blocked`인 워커는 권한 승인을 기다리는 중이라 보고할 수 없습니다.
 
+작업은 자기만의 워커 방식을 고를 수 있습니다. `plan`은 서브에이전트에 없는 도구(브라우저, MCP 서버, 실제 기기 시험)가 필요한 작업에만 `Worker-Mode: session`과 `Worker-Reason:`을 적고, 나머지 작업은 서브에이전트로 둡니다. `issues.js worker-mode --issue N`은 그 작업이 실행될 방식을 출력합니다. 작업의 줄이 `.haku/config.json`의 `workerMode`보다 우선합니다. 서브에이전트 워커에는 일부러 웹 도구(`WebSearch`, `WebFetch`, MCP)가 없습니다. 웹에서 가져온 글은 믿을 수 없는 데이터인데, 워커는 파일을 쓰고 명령도 실행할 수 있기 때문입니다. 다만 워커에게는 네트워크에 닿을 수 있는 `Bash`가 있어서, 위험을 줄일 뿐 없애지는 못합니다. 웹의 사실은 `WebSearch`와 `WebFetch`만 가지고 저장소를 읽을 수 없는 `researcher` 에이전트가 가져옵니다. `issues.js research-post`가 그 출처 있는 보고서를 데이터로 작업 이슈에 남기고(표식이 맨 앞, 토큰·키·비밀번호·개인 경로처럼 보이면 거부), `issues.js research-show`는 소유자·멤버·협업자가 쓴 보고서만 읽어 오며, 웹검색만을 위해 세션 워커를 열지 않습니다. 세션을 고른 작업은 시작할 때 사용자의 승인(`--user-approved`)이 필요합니다. 세션 워커는 모든 도구를 가지기 때문입니다.
+
 ## 라벨과 제목
 
 haku는 고정된 색으로 라벨을 만듭니다. 색조는 Okabe-Ito 팔레트(색각 차이가 있어도 구별됨)에서 가져와 GitHub가 흰 글씨를 쓰도록 어둡게 했고, 기본 라벨에는 마스코트의 갈색을 씁니다. `haku` 갈색, `type:story` 파랑, `type:milestone` 초록, `type:task` 주황, `sprint:*` 보라, `owner:*` 슬레이트, `kind:*`(design, dev, bug, docs, research, chore: 어떤 종류의 일인지)와 상태 라벨 `deferred`, `blocked`, `needs-user`(이슈가 왜 멈춰 있는지)이며, `issues.js labels`와 `issues.js label`로 관리하고, 각각 짧은 설명이 붙습니다. (GitHub는 배경의 밝기로 글자색을 스스로 고르므로, 흰 글씨는 배경을 어둡게 해서 얻습니다.) 이슈 제목에는 `[Story]`, `[Milestone]`, `[Task]` 접두사가 붙어서 색 없이도 종류를 읽을 수 있습니다. 접두사를 끄려면 `.haku/config.json`에 `"titlePrefix": false`를 두세요. 이미 있는 라벨은 haku가 다음에 확인할 때 색이 갱신됩니다(`gh label create --force`).

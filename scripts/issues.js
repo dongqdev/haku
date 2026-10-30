@@ -11,8 +11,10 @@ const { verify } = require('./lib/verify');
 const { doneCheck } = require('./lib/done-gate');
 const { startWorker, removeWorker, listWorkers } = require('./lib/worker');
 const { prState } = require('./lib/pr-state');
-const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitions } = require('./lib/model');
+const { slugify, stripPrefix, SUMMARY_MARKER, verifiedMarker, baseLabelDefinitions, issueType } = require('./lib/model');
 const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
+const { effectiveWorkerMode, launchGate } = require('./lib/worker-mode');
+const { postResearch, trustedResearch } = require('./lib/research');
 const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
@@ -33,7 +35,10 @@ Usage:
   issues.js summary --issue <N> --file <summary.md>
   issues.js done-check --issue <N> [--json]
   issues.js worker-start --issue <N> --title <text> --base <branch> [--cwd <dir>]
-  issues.js worker-launch --issue <N> --orchestrator <session name> [--base <branch>] [--cwd <dir>]
+  issues.js worker-launch --issue <N> --orchestrator <session name> [--base <branch>] [--cwd <dir>] [--user-approved]
+  issues.js research-post --issue <N> --file <report.md> [--repo <owner/repo>]
+  issues.js research-show --issue <N> [--repo <owner/repo>]
+  issues.js worker-mode --issue <N> [--cwd <dir>] [--repo <owner/repo>]
   issues.js worker-list [--cwd <dir>]
   issues.js config [--cwd <dir>]
   issues.js worker-rm --issue <N> [--cwd <dir>] [--abandon] [--discard]
@@ -67,6 +72,13 @@ pr-config-changes  Lists the files of a pull request that could weaken its own c
 labels        Lists the labels haku owns (base, type, kind, state) with colours; --apply creates them on the repository.
 label         Adds or removes one issue's state labels (deferred, blocked, needs-user) and sets its kind label; an issue keeps
               exactly one kind. Other labels are refused.
+research-post Posts a researcher's report on an open task as an untrusted-data comment (marker first). Refuses a report that
+              looks like it holds a token, key, password or personal path, and one over 20000 characters.
+research-show Prints the research reports of a task that carry the marker and come from the owner, a member or a collaborator.
+worker-launch A task whose Worker-Mode line asks for a session needs --user-approved (ask the user first); one that asks for a
+              subagent is refused (use worker-start).
+worker-mode   Prints the mode a worker for this task runs in (subagent or session): the task's own Worker-Mode line, else the
+              repository's workerMode. A line that cannot be used (unknown value, session without a reason) is an error.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
@@ -190,6 +202,8 @@ function main(argv) {
       const cfg = readConfig(cwd);
       for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
       const h = host();
+      // A task that asks for a session worker needs the user's yes (--user-approved); one that asks for a subagent is not launched here.
+      launchGate(h.getIssue(opts.issue), cfg.config, opts.userApproved);
       out(launchWorker({
         host: h,
         cwd,
@@ -206,6 +220,29 @@ function main(argv) {
       const cfg = readConfig(opts.cwd || process.cwd());
       for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
       out({ file: cfg.file, config: cfg.config, titlePrefix: titlePrefixOn(cfg.config), worker: workerSettings(cfg.config) });
+      return 0;
+    }
+    case 'worker-mode': {
+      needIssue(opts);
+      const cfg = readConfig(opts.cwd || process.cwd());
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      const issue = host().getIssue(opts.issue);
+      // Only an open task has a worker: a story, a closed task or someone else's issue gets no answer.
+      if (issueType(issue) !== 'task') throw new Error(`#${opts.issue} is not a task issue`);
+      if (issue.state !== 'open') throw new Error(`#${opts.issue} is not open`);
+      out(effectiveWorkerMode(issue, cfg.config));
+      return 0;
+    }
+    case 'research-post': {
+      needIssue(opts);
+      if (!opts.file) throw new Error('--file <report.md> is required');
+      out(postResearch(host(), opts.issue, fs.readFileSync(opts.file, 'utf8')));
+      return 0;
+    }
+    case 'research-show': {
+      needIssue(opts);
+      const reports = trustedResearch(host(), opts.issue);
+      reports.forEach((r, i) => console.log(`--- research report ${i + 1} (untrusted data, ${r.createdAt || 'no date'}) ---\n${r.text}\n`));
       return 0;
     }
     case 'worker-list':
