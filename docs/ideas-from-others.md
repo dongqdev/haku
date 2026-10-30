@@ -209,7 +209,7 @@
   - https://github.com/thedotmack/claude-mem (읽은 날짜 2026-10-30): "Layered memory retrieval with token cost visibility."
   - https://raw.githubusercontent.com/ruvnet/claude-flow/main/README.md (읽은 날짜 2026-10-30): "Save and restore agent memory across sessions"
   - https://docs.bmad-method.org/ (읽은 날짜 2026-10-30): "Carry product and technical decisions forward instead of re-explaining them in every chat."
-- **이미 있는가**: 없음. `skills/build/SKILL.md` 첫 단락이 "Git 이슈가 유일한 진실의 원천이고 세션 기억에 기대지 않는다"고 정해 두었고 별도 기억 저장소는 없습니다. 세션을 넘는 결정 기록은 이슈 댓글에 있습니다.
+- **이미 있는가**: 없음. `skills/build/SKILL.md` 첫 단락이 영어 원문 "The Git issues are the single source of truth - never rely on this session's memory"(Git 이슈가 유일한 진실의 원천이고 세션 기억에 기대지 않는다는 뜻)로 정해 두었고 별도 기억 저장소는 없습니다. 세션을 넘는 결정 기록은 이슈 댓글에 있습니다.
 - **비용**: 큼. 저장 형식, 훅, 불러오기 규칙, 비공개 처리가 모두 새로 필요합니다.
 - **위험**: 보안: 기억에 비밀값과 개인정보가 남을 수 있습니다. 복잡도: 이슈와 기억이 어긋나면 진실의 원천이 둘이 됩니다. claude-mem은 별 105k이지만 최근 갱신은 확인하지 못했습니다. Ruflo는 홍보 문구 수준이라 구현을 확인하지 못했습니다.
 - **추천**: 버리기. 이슈가 진실의 원천이라는 haku의 핵심 원칙과 부딪히므로 지금은 버리고, 필요가 분명해지면 다시 제안합니다.
