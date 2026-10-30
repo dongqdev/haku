@@ -1,0 +1,63 @@
+name: 버그 제보 / Bug report
+description: haku가 기대와 다르게 동작했어요 / haku did not behave as expected
+labels: ["kind:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제보해 주셔서 고맙습니다. 아래를 채워 주시면 훨씬 빨리 고칠 수 있어요. 한글이나 영어 모두 괜찮습니다.
+        Thank you for reporting. Korean or English is fine.
+
+        **비밀값(토큰, 비밀번호)과 개인 경로(내 컴퓨터 사용자 이름이 들어간 경로)는 지우고 붙여 주세요.**
+        **보안 문제는 여기에 올리지 마세요.** `SECURITY.md`를 봐 주세요.
+  - type: input
+    id: haku-version
+    attributes:
+      label: haku 버전 / haku version
+      description: "`.claude-plugin/plugin.json`의 version, 또는 `/plugin`에 보이는 버전"
+      placeholder: "0.14.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 운영체제 / Operating system
+      options: [Linux, macOS, Windows, WSL, 기타 / other]
+    validations:
+      required: true
+  - type: input
+    id: claude-code-version
+    attributes:
+      label: Claude Code 버전 / Claude Code version
+      description: "`claude --version`의 결과"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: 무엇을 실행했나요? / What did you run?
+      description: 입력한 스킬이나 명령(`/haku:plan`, `issues.js ...`)과 그 직전 상황
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제로 어떻게 됐나요? / What happened?
+      description: 오류 메시지나 출력을 그대로 붙여 주세요
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 어떻게 되길 기대했나요? / What did you expect?
+    validations:
+      required: true
+  - type: checkboxes
+    id: cleaned
+    attributes:
+      label: 확인
+      options:
+        - label: 붙여 넣은 내용에서 비밀값과 개인 경로를 지웠습니다 / I removed secrets and personal paths
+          required: true

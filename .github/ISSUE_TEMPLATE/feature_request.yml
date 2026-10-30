@@ -1,0 +1,26 @@
+name: 기능 제안 / Feature request
+description: haku에 이런 게 있으면 좋겠어요 / An idea for haku
+labels: ["kind:design"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        제안해 주셔서 고맙습니다. 한글이나 영어 모두 괜찮습니다. Korean or English is fine.
+        보안 문제는 여기에 올리지 마세요. `SECURITY.md`를 봐 주세요.
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 불편이 있나요? / What problem do you have?
+      description: 만들고 싶은 기능보다, 지금 겪는 불편을 먼저 적어 주세요
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 어떻게 되면 좋을까요? / What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 지금은 어떻게 해결하고 있나요? / What do you do today?
