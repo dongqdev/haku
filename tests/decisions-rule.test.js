@@ -30,6 +30,7 @@ function section(text, title) {
 const HOME = 'skills/sniff/SKILL.md';
 const REF_PATH = '${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md';
 const OTHERS = SKILLS.filter(f => f !== HOME);
+const RARE = ['skills/status/SKILL.md', 'skills/triage/SKILL.md'];
 
 test('the full decision rule is in exactly one skill, unchanged', () => {
   assert.ok(SKILLS.includes(HOME));
@@ -62,6 +63,13 @@ test('every other skill refers to the rule and keeps its meaning', () => {
     assert.ok(ref.includes(REF_PATH), `${f}: no path to the full rule`);
     assert.ok(ref.includes('`## Decisions`'), `${f}: does not name the section`);
     assert.ok(ref.split(/\s+/).length < 60, `${f}: reference grew into a copy of the rule`);
+  }
+});
+
+test('skills that ask often keep the practical details beside the reference', () => {
+  for (const f of OTHERS.filter(f => !RARE.includes(f))) {
+    const ref = section(read(f), 'Decisions');
+    assert.ok(ref.includes('Recommended option first, literal UTF-8, no prose questions at reply end, never postpone.'), f);
   }
 });
 

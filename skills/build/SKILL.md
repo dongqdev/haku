@@ -11,7 +11,7 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 ## Decisions
 
-Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
+Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Recommended option first, literal UTF-8, no prose questions at reply end, never postpone. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
 
 ## Loop
 
