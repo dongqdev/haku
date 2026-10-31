@@ -11,7 +11,7 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 ## Decisions
 
-Ask the user to decide only through a choice question (AskUserQuestion), never in free text: recommended option first and marked "(Recommended)", question text as literal UTF-8 (no `\uXXXX` escapes). Only the orchestrator talks to the user; a worker sends its decision request to the orchestrator. Any sentence that asks the user to answer or choose is a decision, small and procedural ones too. Before ending a reply, read its last paragraph; if it asks in prose, turn it into a choice question. Never postpone a question, and if the tool call is declined, ask again, shorter. A step the user already instructed needs no question.
+Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
 
 ## 1. Gather
 
