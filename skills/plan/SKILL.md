@@ -11,7 +11,7 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 ## Decisions
 
-Ask the user to decide only through a choice question (AskUserQuestion), never as a free-text question. Put the recommended option first and mark it "(Recommended)". Notices and reports are plain text. Write the question text as literal UTF-8; never use `\uXXXX` escapes, which can garble Korean. Only the orchestrator talks to the user; a worker that needs a decision sends it to the orchestrator. This covers small and procedural questions too (whether to go on, when to ask, A or B): any sentence that asks the user to answer or choose is a decision. Before ending a reply, read its last paragraph; if it asks in prose (a question mark, "shall I", "let me know"), turn it into a choice question. Never postpone a question to later, and never fall back to prose when the tool call is declined: ask again, shorter, one decision with a one-line explanation. A step the user already instructed needs no question.
+Ask the user to decide only through a choice question (AskUserQuestion), never in free text: recommended option first and marked "(Recommended)", question text as literal UTF-8 (no `\uXXXX` escapes). Only the orchestrator talks to the user; a worker sends its decision request to the orchestrator. Any sentence that asks the user to answer or choose is a decision, small and procedural ones too. Before ending a reply, read its last paragraph; if it asks in prose, turn it into a choice question. Never postpone a question, and if the tool call is declined, ask again, shorter. A step the user already instructed needs no question.
 
 ## 1. Understand
 
@@ -24,6 +24,8 @@ If `sniff` passed you the path of a goal summary, use exactly that file. Otherwi
 If a goal summary's 열린 질문 section still holds a `[확인 필요]` marker, resolve those first with choice questions (one decision each, recommended option first) and write the answers into the summary file before drafting. Do not draft over an open marker.
 
 **If the goal is vague** - you cannot state its success criteria and what is out of scope - do not draft. Hand over to `/haku:sniff` (or ask with a choice question whether to), and plan from the goal summary it saves in `.haku/drafts/<slug>.goal.md`.
+
+If the goal touches a platform feature (Claude Code, plugins, hooks, skills), have the read-only `researcher` check the official docs for an existing feature before designing your own, and record the finding (found / not found / could not check) in one line of the draft body or assumptions.
 
 ## 2. Draft
 

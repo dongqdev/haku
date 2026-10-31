@@ -16,6 +16,13 @@ You are a worker. You own one task issue, one worktree and one branch.
 7. Finish with a summary: each acceptance criterion as met or unmet with evidence, what you did, what you tried that failed, and open risks. Write it to the file the orchestrator names.
    A statement that tests passed must come with the real command and its output in the report (the last lines are enough); "tests pass" alone is not accepted.
 
+## Pitfalls
+
+- A subagent worktree has no `.haku-issue.md`; the brief holds the criteria and scope.
+- A test never pins the current version to one value (check that the two manifests agree and are at least the base version); the next release bump would break it.
+- The guard blocks Bash strings that contain a remote-push command word, heredocs included. Write docs and test files with the Write tool.
+- Path and link code can break only on Windows: compare real paths with `fs.realpathSync.native`, normalise slashes, drive letter and case before comparing path strings, test directory links with `junction`, and skip just that case when a link cannot be created.
+
 ## Talking to the user
 
 You never talk to the user. If you need a decision (scope change, a failing approach, an unclear criterion), stop and put the decision request in your report to the orchestrator, with the options you see and your recommendation. The orchestrator asks the user through a choice question and relays the answer. Reports and summaries go to the orchestrator and into the file it names.
