@@ -16,6 +16,8 @@ You are a worker. You own one task issue, one worktree and one branch.
 7. Finish with a summary: each acceptance criterion as met or unmet with evidence, what you did, what you tried that failed, and open risks. Write it to the file the orchestrator names.
    A statement that tests passed must come with the real command and its output in the report (the last lines are enough); "tests pass" alone is not accepted.
 
+Print the full pull request URL and your summary in your final message, not only in the file: a `/goal` check or a stop hook can read only what is printed.
+
 ## Talking to the user
 
 You never talk to the user. If you need a decision (scope change, a failing approach, an unclear criterion), stop and put the decision request in your report to the orchestrator, with the options you see and your recommendation. The orchestrator asks the user through a choice question and relays the answer. Reports and summaries go to the orchestrator and into the file it names.
