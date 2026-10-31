@@ -66,14 +66,14 @@
 
 | 훅 | 이벤트·매처 | 읽는 것 | 막거나 남기는 것 | 실패하면 |
 |---|---|---|---|---|
-| A. 작업 파일 범위 검사 | PreToolUse, Edit 또는 Write | `tool_input.file_path`(절대 경로), 작업 폴더의 `.haku-issue.md`에 적힌 `Scope:` | 범위 밖 파일 쓰기를 막습니다(종료 코드 2, 이유는 표준 오류로). 아무것도 남기지 않습니다. | 열림(fail open), 단 확정된 위반만 막음 |
+| A. 작업 파일 범위 검사 | PreToolUse, Edit 또는 Write | `tool_input.file_path`(절대 경로), 작업 폴더의 `.haku-issue.md`에 적힌 `Scope:` | 1단계: 범위 밖 파일 쓰기를 기록만 합니다(종료 코드 0). 2단계: 사용자에게 확인을 묻습니다(`ask`). 막지 않습니다. | 열림(fail open), 확정된 위반만 기록하거나 묻음 |
 | B. 푸시 차단 | PreToolUse, Bash | `tool_input.command` | 워커 세션의 원격 반영과 기본 브랜치로 가는 푸시를 막습니다. | 워커 세션이 확인된 경우에만 닫힘(fail closed) |
 | C. 검사 약화 감지 | PreToolUse, Edit 또는 Write | 대상 경로, `weaken.js`의 패턴 목록 | 막지 않습니다. 경고만 내서(`ask` 또는 시스템 메시지) 사용자가 보게 합니다. | 열림(fail open) |
 | D. 세션 종료 교정 수집 | SessionEnd | `transcript_path`의 사용자 메시지 | 정정 문장 후보를 로컬 파일에 한 줄씩 남깁니다. 막지 않습니다. | 열림(fail open), 항상 |
 
 이유를 하나씩 적습니다.
 
-- **A는 확정된 위반만 막고, 읽지 못하면 통과시킵니다.** 범위 파일이 없거나 형식을 못 읽으면 막을 근거가 없습니다. 잘못 막으면 일이 멈춥니다. 최종 방어선은 지금처럼 병합 단계의 범위 검사입니다. 훅은 "빨리 알리는" 층입니다. 범위는 워커가 시작할 때 선언한 값을 써야 합니다(`worker.js`가 같은 이유로 시작 시점의 값을 씁니다). 이슈를 나중에 고쳐 범위를 넓히는 길을 훅이 열어 주면 안 됩니다.
+- **A는 확정된 위반만 기록하거나 묻고, 읽지 못하면 통과시킵니다.** 범위 파일이 없거나 형식을 못 읽으면 다룰 근거가 없습니다. 잘못 막으면 일이 멈추므로 막지 않습니다(재생 측정에서 막았다면 정상 작업이 절반쯤 걸렸을 것입니다). 최종 방어선은 지금처럼 병합 단계의 범위 검사입니다. 훅은 "빨리 알리는" 층입니다. 범위는 워커가 시작할 때 선언한 값을 써야 합니다(`worker.js`가 같은 이유로 시작 시점의 값을 씁니다). 이슈를 나중에 고쳐 범위를 넓히는 길을 훅이 열어 주면 안 됩니다.
 - **B는 되돌릴 수 없는 행동이라 닫힘이 맞습니다.** 다만 Bash 매처는 모든 명령에 붙습니다. `onFailure: block`을 설정에 걸면 훅이 죽을 때 모든 Bash가 막힙니다. 그래서 설정에는 걸지 않고, 스크립트가 (1) haku 워커 세션인지 판별하고 (2) 판별 단계의 오류는 통과시키고 (3) 워커 세션이 확인된 뒤 명령을 못 읽으면 스스로 2로 끝납니다. 이 "판별 후에만 닫힘" 규칙이 핵심입니다.
 - **C는 막지 않습니다.** `weaken.js`가 이미 "경고 목록이지 차단이 아니다. 차단이 고장 나면 사람이 갇힌다"는 원칙을 씁니다. 같은 원칙을 지킵니다. 패턴 목록은 `weaken.js`를 그대로 가져다 씁니다(복사하지 않음).
 - **D는 항상 열립니다.** SessionEnd의 예산은 약 1.5초라 오래 걸리면 어차피 끊깁니다. 수집이 세션 종료를 막거나 늦추면 안 됩니다. Stop 이벤트는 쓰지 않습니다. 종료 코드 2가 Claude를 계속 일하게 만들기 때문입니다. 방지책은 확인했습니다(2026-10-30에 읽은 공식 문서 기준): `stop_hook_active`가 true면 일찍 0으로 끝내고, 연속 8번 막으면 Claude Code가 다음 차단을 무시합니다. 이 상한 덕분에 Stop 훅을 써도 영원히 멈추지 않는 일은 없습니다. 그래도 쓰지 않습니다. 8번의 헛수고를 겪을 수 있고, 세션 종료 수집에는 SessionEnd로 충분하기 때문입니다.
@@ -144,7 +144,7 @@
 2. **남의 프로젝트를 막는 훅**: 전역 설치라 haku 아닌 저장소에서도 돕니다. 대응: `.haku/config.json`이 없으면 즉시 0.
 3. **거짓 안심**: 푸시 차단이 우회되는데 "막았다"고 믿는 경우. 대응: 훅은 보조라고 문서에 쓰고 브랜치 보호를 유지합니다.
 4. **훅 코드가 공격면**: 표준입력의 명령 문자열을 셸에 넘기면 주입이 됩니다. 대응: 문자열은 파싱만 하고 어떤 셸에도 넘기지 않습니다. 경로는 정규화한 뒤 비교합니다.
-5. **범위 파일을 고쳐 우회**: 워커가 `.haku-issue.md`나 훅 설정을 고쳐 막힘을 풉니다. 대응: 훅 A가 그 파일과 `.claude/` 쓰기도 범위 밖으로 막고, 범위는 시작 시점 값을 씁니다.
+5. **범위 파일을 고쳐 우회**: 워커가 `.haku-issue.md`나 훅 설정을 고쳐 막힘을 풉니다. 대응: 훅 A가 그 파일과 `.claude/` 쓰기도 범위 밖으로 보고, 범위는 시작 시점 값을 씁니다.
 6. **수집이 비밀을 모음**: 걸러내기 규칙에 빈틈이 있으면 비밀이 디스크에 남습니다. 대응: 통째 버리기, 300자 제한, 30일 보존, 한 명령 삭제, 꺼진 기본값.
 7. **오탐으로 잘못된 규칙이 쌓임**: 사용자 확인 없이 학습되지 않게 합니다(4절 2~3).
 8. **느려짐**: 모든 도구 호출마다 Node가 뜹니다. 대응: 매처를 좁히고, 판별을 맨 앞에서 하고, 시간 제한을 짧게 둡니다.
@@ -159,7 +159,8 @@
 
 1. **0단계**: 이 문서를 사용자가 승인합니다. 미확인 세 가지(Stop 반복 방지, 플러그인 훅 승인 절차, 플러그인 끄기 명령)는 2026-10-30에 읽은 공식 문서로 확인을 마쳤습니다. 남은 미확인은 플러그인 훅 전용 첫 실행 승인의 유무, 일반 플러그인 훅과 폴더 신뢰의 순서, `claude plugin disable`의 같은 세션 즉시 효과입니다. 1단계의 실환경 확인에서 이 셋을 실제로 시험합니다.
 2. **1단계**: 공용 함수(haku 저장소 판별, 경로 정규화)와 훅 A를 "기록만 하는 모드"로 시범 설치합니다. 선택 설치 한 저장소에서 오탐 수를 봅니다.
-3. **2단계**: 훅 A를 막는 모드로 올립니다. 오탐이 없을 때만.
+3. **2단계**: 훅 A를 확인 모드로 올립니다. 범위 밖 쓰기마다 사용자에게 허용 여부를 묻고(PreToolUse의 `permissionDecision`을 `ask`로 돌려줌), 어떤 오류에서도 열림(fail open)입니다. 막는 모드는 이후 측정에서 오탐이 없다고 확인될 때만 다시 검토합니다. 훅 출력의 정확한 필드 이름과 동작은 이 문서에서 확인한 적이 없으므로 **미확인**이고, 구현 전에 공식 문서와 실환경에서 확인합니다.
+   - **측정 결과(2026-10-31)**: 병합된 PR 42개를 기록 모드로 재생했습니다(쓰기 391건). 범위 밖 쓰기는 13개 PR에서 33건이었고, 범위 기본 항목(README, `.claude-plugin/**`)을 더하니 11개 PR에서 22건이 남았습니다. 이 22건 중 11건은 범위 줄이 좁았던 정상 작업(막으면 오탐), 11건은 실제로 범위를 넘은 것이었습니다. 그래서 막는 모드가 아니라 확인 모드로 갑니다. 이 재생은 범위 줄의 정확도를 잰 것이고, 훅이 실제 세션에서 도는 동작은 재지 못했습니다.
 4. **3단계**: 훅 C(약화 경고). 위험이 가장 낮습니다.
 5. **4단계**: 훅 B(푸시 차단). 우회 시험을 먼저 씁니다.
 6. **5단계**: 수동 표시 명령과 `retro`의 읽기, 삭제 명령. 자동 수집 없이 먼저 흐름만 확인합니다.
@@ -316,14 +317,14 @@ Every hook first asks "is this a haku-managed repository?". It walks up from the
 
 | Hook | Event and matcher | Reads | Blocks or records | On failure |
 |---|---|---|---|---|
-| A. Task file-scope check | PreToolUse, Edit or Write | `tool_input.file_path` (absolute), the `Scope:` line in `.haku-issue.md` in the work folder | Blocks writes to files outside the scope (exit 2, reason on standard error). Records nothing. | Open (fail open), but a confirmed violation is blocked |
+| A. Task file-scope check | PreToolUse, Edit or Write | `tool_input.file_path` (absolute), the `Scope:` line in `.haku-issue.md` in the work folder | Stage 1: only records writes to files outside the scope (exit 0). Stage 2: asks the user to confirm (`ask`). Never blocks. | Open (fail open); only a confirmed violation is recorded or asked about |
 | B. Push block | PreToolUse, Bash | `tool_input.command` | Blocks remote publishing in worker sessions and any push to the default branch. | Closed (fail closed), only when a worker session is confirmed |
 | C. Weakened-check detection | PreToolUse, Edit or Write | target path, the pattern list of `weaken.js` | Does not block. It warns (`ask` or a system message) so the user sees it. | Open (fail open) |
 | D. Session-end correction capture | SessionEnd | the user messages in `transcript_path` | Appends candidate correcting sentences to a local file, one per line. Does not block. | Open (fail open), always |
 
 The reasons, one by one.
 
-- **A blocks only a confirmed violation and lets everything else through.** With no scope file, or one that cannot be read, there is no ground to block, and a wrong block stops the work. The last line of defense stays the merge-time scope check. The hook is the layer that tells early. It must use the scope declared when the worker started (`worker.js` uses the start-time value for the same reason). The hook must not open a path where editing the issue later widens the scope.
+- **A records or asks only about a confirmed violation and lets everything else through.** With no scope file, or one that cannot be read, there is no ground to act on, and a wrong block stops the work, so it never blocks (in the replay, blocking would have stopped about half of the flagged normal work). The last line of defense stays the merge-time scope check. The hook is the layer that tells early. It must use the scope declared when the worker started (`worker.js` uses the start-time value for the same reason). The hook must not open a path where editing the issue later widens the scope.
 - **B is irreversible, so closed is right.** But the Bash matcher attaches to every command. With `onFailure: block` in the config, a crashing hook would block all Bash. So the config does not set it, and the script (1) decides whether this is a haku worker session, (2) lets errors in that step pass, and (3) once a worker session is confirmed, exits 2 itself if it cannot read the command. "Closed only after detection" is the key rule.
 - **C does not block.** `weaken.js` already states the principle: it is a warning list, never a block, because a broken block locks people out. This design keeps it. The patterns are imported from `weaken.js`, not copied.
 - **D is always open.** The SessionEnd budget is about 1.5 seconds, so a slow hook is cut off anyway. Capture must never block or delay the end of a session. The Stop event is not used: exit 2 there makes Claude keep working. The prevention is confirmed (per the docs read on 2026-10-30): exit early with 0 when `stop_hook_active` is true, and after 8 blocks in a row Claude Code ignores the next block. That cap means a Stop hook would not stop Claude from ever finishing. It is still not used: it could cost eight wasted rounds, and SessionEnd is enough for session-end capture.
@@ -409,7 +410,8 @@ Each stage is its own issue and PR, and the next starts after the result of the 
 
 1. **Stage 0**: the user approves this document. The three formerly unverified items (Stop loop prevention, the plugin hook approval step, the command to disable a plugin) were checked against the docs read on 2026-10-30. What remains unverified: whether a plugin-hook-specific first-run approval exists, the order of normal plugin hooks and folder trust, and whether `claude plugin disable` takes effect at once in the same session. The real-environment check of stage 1 tests these three.
 2. **Stage 1**: the shared functions (haku repository detection, path normalization) and hook A in "record only" mode, as a pilot in one opted-in repository. Count the false positives.
-3. **Stage 2**: raise hook A to blocking mode, only if there were none.
+3. **Stage 2**: raise hook A to ask mode. For each write outside the scope the user is asked to allow or refuse it (PreToolUse returns `permissionDecision` `ask`), and any error fails open. Blocking mode is reconsidered only if a later measurement shows no false positives. The exact field name and behaviour of the hook output have not been checked in this document (**unverified**); verify them against the official docs and a live session before building.
+   - **Measured result (2026-10-31)**: the 42 merged PRs were replayed in record-only mode (391 writes). There were 33 writes outside the scope in 13 PRs; after adding the default scope entries (README, `.claude-plugin/**`), 22 writes in 11 PRs remained. Of these 22, 11 were normal work whose scope line was too narrow (false positives if blocked) and 11 were genuine overreach. That is why the next step is ask mode, not blocking. The replay measures how accurate the scope lines are, not how the hook behaves in a live session.
 4. **Stage 3**: hook C (weakening warning). The lowest risk.
 5. **Stage 4**: hook B (push block). Write the bypass tests first.
 6. **Stage 5**: the manual mark command, the `retro` reading and the delete command. Check the flow first without automatic capture.
