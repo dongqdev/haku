@@ -63,6 +63,49 @@ Remove the entry from `.claude/settings.local.json`. To drop the data, delete `s
 않으며, 저장소의 `.claude/settings.local.json`에 위 예시를 직접 넣어야 켜집니다. 끄려면 그 항목을 지우세요.
 `CLAUDE_PLUGIN_DATA`가 없으면 아무것도 기록하지 않습니다.
 
+## Worker stop check (`hooks/worker-stop.js`) - blocks once, opt-in
+
+A `SubagentStop` hook for the `worker` agent. When a worker ends its report with no pull request (address, "PR",
+"pull request"), no summary, no question and no "blocked" notice, the hook exits 2 with a reason on stderr, which
+makes the worker keep going once. This is the first haku hook that can block. Guards, in this order:
+
+- `stop_hook_active` true (the worker is already continuing because of a stop hook): pass.
+- The official hooks docs do not say whether `SubagentStop` input carries `stop_hook_active`, so the hook does not
+  rely on it. It also keeps its own marker file (in the temp folder, one per `agent_id`, falling back to the agent's
+  transcript path or the session id) and never blocks the same agent twice. With none of those ids in the input it
+  does not block at all. If the marker cannot be written, it passes. So it blocks at most once per agent whether or
+  not the field is there.
+- Claude Code itself ignores stop-hook blocks after 8 in a row, so this is a help, not a guarantee. The orchestrator
+  still checks the report, the pull request and the checks itself; the hook never replaces that.
+- The agent is not `worker` (or `haku:worker`), the input is broken or over 1 MB, or there is no text to judge: pass.
+- Any error in the script: pass (exit 0).
+
+The plugin does not switch it on (no `hooks/hooks.json`); the default stays off. To opt in, in the repository's
+`.claude/settings.local.json` (adjust the path):
+
+```json
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node", "args": ["/path/to/haku/hooks/worker-stop.js"] }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Turn it off by removing the entry. The check is a rough text match, so a worker whose report mentions a pull request
+only in passing passes; it is a safety net for an empty "done." report, not a quality gate.
+
+### 요약 (한국어)
+
+`worker` 에이전트가 PR도 요약도 질문도 막힘 알림도 없이 끝내면 한 번만 계속하게 막는 SubagentStop 훅입니다(종료 코드 2).
+`stop_hook_active`를 가장 먼저 확인해 재진입 시 통과하고(SubagentStop 입력에 이 값이 있는지 공식 문서에 없어 자체 마커 파일로 에이전트당 한 번만 막음), 워커가 아니거나 판정할 수 없거나 오류가 나면 통과합니다.
+연속 8회 차단 뒤에는 무시되므로 보증이 아니라 보조이며 최종 검증은 오케스트레이터가 합니다. 기본은 꺼짐이며 위 예시를 `settings.local.json`에 직접 넣어야 켜집니다.
+
 ## Collecting correction sentences (`issues.js corrections`)
 
 A hand-made, local list of short sentences that correct the agent, for the next retro. Nothing is captured

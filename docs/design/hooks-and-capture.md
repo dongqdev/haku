@@ -166,6 +166,7 @@
 6. **5단계**: 수동 표시 명령과 `retro`의 읽기, 삭제 명령. 자동 수집 없이 먼저 흐름만 확인합니다.
 7. **6단계**: 훅 D(자동 수집). 켜기는 선택이고 기본은 꺼짐.
 8. **7단계**: 플러그인 `hooks.json` 배포 여부를 다시 결정합니다.
+9. **결정 변경(0.16.19)**: 워커가 PR이나 요약 없이 끝나는 것을 막으려고 막는 훅 E(`hooks/worker-stop.js`, SubagentStop)를 도입합니다. 위 "Stop 이벤트는 쓰지 않는다" 결정은 SubagentStop의 이 한 훅에 한해 바뀝니다. 지킨 조건: `stop_hook_active`를 먼저 확인해 재진입은 통과(입력에 없어도 자체 마커 파일로 에이전트당 한 번만), 워커 에이전트가 아니거나 판정 불가이면 통과, 어떤 오류에서도 열림(fail open), 한 번만 막음. 기본은 꺼짐(옵트인, `settings.local.json`)이며 7단계의 `hooks.json` 배포 결정은 그대로 미룹니다.
 
 ### 8. 사용자가 고를 결정 목록
 
@@ -417,6 +418,7 @@ Each stage is its own issue and PR, and the next starts after the result of the 
 6. **Stage 5**: the manual mark command, the `retro` reading and the delete command. Check the flow first without automatic capture.
 7. **Stage 6**: hook D (automatic capture). Turning it on is optional; the default is off.
 8. **Stage 7**: decide again whether to ship the plugin `hooks.json`.
+9. **Decision change (0.16.19)**: to stop a worker from ending without a PR or summary, a blocking hook E (`hooks/worker-stop.js`, SubagentStop) is introduced. The earlier "the Stop event is not used" decision changes for this one SubagentStop hook only. Conditions kept: `stop_hook_active` is checked first and a re-entry passes (and an own marker file limits it to once per agent even if the field is absent), a non-worker agent or an undecidable input passes, any error fails open, and it blocks once. It is off by default (opt-in, `settings.local.json`); the stage 7 decision on shipping `hooks.json` stays deferred.
 
 ### 8. Decision list for the user
 
