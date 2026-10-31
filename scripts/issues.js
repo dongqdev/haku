@@ -24,6 +24,7 @@ const { buildTriage, renderTriage, closeForTriage } = require('./lib/triage');
 const { renderChanges } = require('./lib/weaken');
 const { prConfigChanges } = require('./lib/pr-config');
 const { checkProtection, renderProtection } = require('./lib/protection');
+const { addCorrection, listCorrections, clearCorrections } = require('./lib/corrections');
 const { listRepoNames, repoExists, checkNames, readUserConfig, planProject, createProject } = require('./lib/newproject');
 
 const HELP = `haku issues
@@ -58,6 +59,7 @@ Usage:
   issues.js labels [--apply] [--json] [--repo <owner/repo>]
   issues.js label --issue <N> [--add <a,b>] [--remove <c>] [--repo <owner/repo>]
   issues.js branch --issue <N> --title <text>
+  issues.js corrections add --text <sentence> | list | clear
   issues.js project-names --names <a,b,c> [--owner <account>]
   issues.js project-new --name <repo> --dir <parent folder> [--owner <account>] [--visibility private|public] [--apply]
 
@@ -89,11 +91,13 @@ worker-launch A task whose Worker-Mode line asks for a session needs --user-appr
               subagent is refused (use worker-start).
 worker-mode   Prints the mode a worker for this task runs in (subagent or session): the task's own Worker-Mode line, else the
               repository's workerMode. A line that cannot be used (unknown value, session without a reason) is an error.
+corrections   Keeps short correction sentences (at most 300 characters) in one local file outside any repository, for the retro.
+              A sentence with a secret or a personal path is not saved. Entries older than 30 days are dropped. Nothing is captured automatically.
 project-new   Dry-run by default; --apply creates the folder, the first commit and the remote repository.
 `;
 
 const VALUE = new Set(['--add', '--remove', '--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story', '--text']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -408,6 +412,22 @@ function main(argv) {
       const change = planLabelChange(h.getIssue(opts.issue), { add: opts.add, remove: opts.remove });
       h.setLabels(opts.issue, change);
       console.log(`#${opts.issue}: +[${change.add.join(', ')}] -[${change.remove.join(', ')}]`);
+      return 0;
+    }
+    case 'corrections': {
+      if (arg1 === 'add') {
+        if (opts.text === undefined) throw new Error('--text <sentence> is required');
+        const r = addCorrection(opts.text);
+        if (!r.saved) {
+          console.error(`[haku] not saved: ${r.reason}`);
+          return 1;
+        }
+        console.log('saved');
+      } else if (arg1 === 'list') {
+        for (const e of listCorrections()) console.log(`${e.time}\t${e.text}`);
+      } else if (arg1 === 'clear') {
+        console.log(clearCorrections() ? 'cleared' : 'nothing to clear');
+      } else throw new Error('corrections needs add, list or clear');
       return 0;
     }
     case 'branch':

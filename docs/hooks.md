@@ -62,3 +62,40 @@ Remove the entry from `.claude/settings.local.json`. To drop the data, delete `s
 작업 범위(`Scope:`) 밖 파일을 쓰려 하면 경로만 기록하고 절대 막지 않습니다(항상 종료 코드 0). 기본으로 켜지지
 않으며, 저장소의 `.claude/settings.local.json`에 위 예시를 직접 넣어야 켜집니다. 끄려면 그 항목을 지우세요.
 `CLAUDE_PLUGIN_DATA`가 없으면 아무것도 기록하지 않습니다.
+
+## Collecting correction sentences (`issues.js corrections`)
+
+A hand-made, local list of short sentences that correct the agent, for the next retro. Nothing is captured
+automatically.
+
+```
+issues.js corrections add --text "<sentence>"
+issues.js corrections list
+issues.js corrections clear
+```
+
+- A sentence is at most 300 characters; a longer one is rejected, never cut.
+- A sentence that looks like a token, key or password, or names a personal path, is not saved at all (never masked);
+  the command names the reason class and does not print the sentence.
+- One file, `$CLAUDE_PLUGIN_DATA/corrections.jsonl` (without it: `~/.haku/corrections.jsonl`), one `{time, text}` JSON
+  line each. A folder inside the current repository is refused (symlinks resolved).
+- Lines older than 30 days are removed on every write and ignored by `list`. `clear` deletes the file.
+
+Cautions:
+
+- The sentence is passed on the command line, so it can show up in the process list, the shell history and the
+  session transcript. Do not type secrets into it; the filter is a safety net, not a promise.
+- The filter is deliberately wide: a long hex or base64-like string (32+ characters), such as a long identifier, is
+  rejected too.
+- `CLAUDE_PLUGIN_DATA` may differ between contexts; when the variable is absent, `list` reads `~/.haku/corrections.jsonl`,
+  which may be a different file than the one a hook-run `add` wrote.
+- The file is written aside and renamed over the old one (no half-written file); two writers at the same moment may
+  lose one entry.
+
+### 요약 (한국어)
+
+교정 문장을 손으로 모으는 목록입니다(자동 수집 없음). 한 문장은 300자까지이며, 넘으면 거절합니다. 토큰·키·비밀번호
+모양이나 개인 경로가 있으면 가리지 않고 통째로 저장하지 않고, 이유 종류만 알립니다. 저장소 안쪽 폴더는 거절합니다.
+30일이 지난 줄은 쓸 때마다 지워지고 `list`에도 안 나옵니다. `clear`는 파일을 지웁니다.
+
+명령줄로 넘기므로 문장이 프로세스 목록·셸 기록·세션 기록에 남을 수 있으니 비밀을 쓰지 마세요. 긴 식별자도 길이 때문에 거절될 수 있고, `CLAUDE_PLUGIN_DATA`가 없는 곳에서는 `~/.haku`를 읽습니다.
