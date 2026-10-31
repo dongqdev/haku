@@ -57,6 +57,7 @@ Rules for a good draft:
 - Every task runs as a **subagent** unless it needs a tool a subagent does not have (a browser, an MCP server, a real device test): then set `"workerMode": "session"` and a one-line `"workerReason"` that names the tool. Never pick a session because the task needs facts from the web: that goes to the read-only `researcher` agent at `build` time (see `build`), and the worker stays offline. A session worker has every tool and only its instructions limit it.
 - One task = one worker = one branch = one reviewable PR. Split anything larger.
 - Every task needs **acceptance** criteria a command or a person can check, and a **scope** (the files it may touch). Tasks whose scopes overlap must be ordered with `dependsOn` so they never run in parallel.
+- **Default scope entries:** a task that changes shipped behaviour must also list `README.md`, `README.en.md` and `.claude-plugin/**` in its scope, because every such task updates the docs and bumps the version in `.claude-plugin/`. Measured on 42 merged tasks, leaving them out made the scope check flag work the user had approved. These three shared entries do not count when you decide whether two scopes overlap. A docs-only or tests-only task leaves them out.
 - Choose the verification tier per task:
   - **T1** - runs automatically on Linux; needs a `profile` defined in `verify.json`.
   - **T2** - must run on Windows/macOS; needs a profile and a CI job or runner for that platform.
