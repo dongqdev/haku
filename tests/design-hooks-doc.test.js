@@ -161,3 +161,9 @@ test('the version files agree and are at least 0.16.10', () => {
   const [a, b, c] = plugin.version.split('.').map(Number);
   assert.ok(a > 0 || b > 16 || (b === 16 && c >= 10), `version ${plugin.version} is older than 0.16.10`);
 });
+
+test('stage 2 of hook A is ask mode with the measured result and an unverified field name', () => {
+  const need = { ko: ['확인 모드', '`ask`', '391', '미확인'], en: ['ask mode', '`ask`', '391', 'unverified'] };
+  for (const k of ['ko', 'en']) for (const w of need[k]) assert.ok(part(LANGS[k].title).includes(w), `${k}: missing ${w}`);
+  assert.ok(!/raise hook A to blocking mode/.test(text) && !text.includes('훅 A를 막는 모드로'), 'stage 2 no longer promises blocking mode');
+});
