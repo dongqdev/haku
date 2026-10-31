@@ -17,7 +17,7 @@ claude plugin eval . --no-publish --threshold 0.8 --max-cost-usd <상한>
 
 - **경고**: 모든 실행이 계정에서 진짜 모델 호출입니다(구독 사용량이나 API 요금). 사례 수 x 시행 수 x 2(플러그인 있을 때와 없을 때)만큼 에이전트가 돕니다. 반드시 `--max-cost-usd`를 지정하세요.
 - **CI에 넣지 않습니다.** CI에는 모델 키가 없고 키를 저장소에 두지 않습니다. CI는 `tests/evals-format.test.js`로 형식만 검사합니다(모델 호출 없음).
-- 이 PR에서는 평가를 한 번도 실행하지 않았습니다(인증 정보 없음). 아래 명령과 형식은 모두 **미확인**입니다.
+- 2026-10-31에 실제로 실행했습니다(결과는 아래 표). 명령과 형식은 이 실행으로 확인됐습니다. 확인된 함정: `max: 0`만 쓰면 `min` 기본값 1 때문에 "1..0"이 되어 항상 실패하므로 `min: 0`을 함께 써야 합니다.
 - 정적 검사로 `claude plugin validate`가 있다고 하나 이 역시 실행해 보지 않았습니다(미확인).
 - `evals/`는 플러그인의 다른 파일과 함께 사용자의 설치본에 복사됩니다. 그래서 작게 유지합니다.
 
@@ -33,7 +33,8 @@ claude plugin eval . --no-publish --threshold 0.8 --max-cost-usd <상한>
 
 | 날짜 | Claude Code 버전 | 모델 | 사례 | 시행 수 | 점수 | 통과(문턱) | 비용(USD) | 메모 |
 |---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| 2026-10-31 | 2.1.316 | 기본값 | 전체 15사례(7개 스킬) | 3 | 1.0 | 15/15 (1.0) | 2.90 | 플러그인 켠 쪽 45/45 통과, 끈 쪽은 should-trigger 7사례 전부 0/3 |
+| 2026-10-31 | 2.1.316 | 기본값 | sniff 사례 x 반복 3회 | 5 | 1.0 | 통과 | 약 2.5 | 반복 간 분산 0 (플러그인 켠 쪽 전부 통과) |
 
 ## English
 
@@ -52,7 +53,7 @@ claude plugin eval . --no-publish --threshold 0.8 --max-cost-usd <limit>
 
 - **Warning**: every run is a real model call on your account (plan usage or API bill). Roughly cases x runs x 2 (with and without the plugin) agent runs. Always set `--max-cost-usd`.
 - **Not put into CI.** CI has no model key and keys are not stored in the repository. CI only checks the file format with `tests/evals-format.test.js` (no model call).
-- No eval was run in this PR (no credentials). The command and the file format below are all **unverified**.
+- Run for real on 2026-10-31 (results in the table below); the command and format are confirmed by that run. Pitfall found: `max: 0` alone means "1..0" because `min` defaults to 1 and always fails, so write `min: 0` with it.
 - `claude plugin validate` is said to be a static check; it was not run either (unverified).
 - `evals/` is copied into the user's installed copy of the plugin together with everything else, so keep it small.
 
@@ -68,4 +69,5 @@ claude plugin eval . --no-publish --threshold 0.8 --max-cost-usd <limit>
 
 | Date | Claude Code version | Model | Case | Runs | Score | Pass (threshold) | Cost (USD) | Notes |
 |---|---|---|---|---|---|---|---|---|
-| | | | | | | | | |
+| 2026-10-31 | 2.1.316 | default | all 15 cases (7 skills) | 3 | 1.0 | 15/15 (1.0) | 2.90 | with-plugin 45/45 pass; without-plugin 0/3 on all 7 should-trigger cases |
+| 2026-10-31 | 2.1.316 | default | sniff cases x 3 repeats | 5 | 1.0 | pass | ~2.5 | zero variance across repeats (with-plugin all pass) |
