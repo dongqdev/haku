@@ -26,9 +26,17 @@ function section(text, title) {
   return m[1].trim();
 }
 
-test('every skill carries exactly the decision rule', () => {
+// The full rule lives in one skill; every other skill keeps a short reference that still carries its meaning.
+const HOME = 'skills/sniff/SKILL.md';
+const REF_PATH = '${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md';
+const OTHERS = SKILLS.filter(f => f !== HOME);
+const RARE = ['skills/status/SKILL.md', 'skills/triage/SKILL.md'];
+
+test('the full decision rule is in exactly one skill, unchanged', () => {
+  assert.ok(SKILLS.includes(HOME));
   assert.ok(SKILLS.length >= 7, `expected the full skill set, found ${SKILLS.length}`);
-  for (const f of SKILLS) assert.strictEqual(section(read(f), 'Decisions'), RULE, f);
+  assert.strictEqual(section(read(HOME), 'Decisions'), RULE);
+  for (const f of OTHERS) assert.ok(!read(f).includes(RULE), `${f}: carries a second copy of the rule`);
 });
 
 // Each added sentence on its own, so a test failure names the sentence that was deleted or reversed.
@@ -41,10 +49,27 @@ const ADDED = [
   'A step the user already instructed needs no question'
 ];
 
-test('every skill carries each sentence of the strengthened rule', () => {
-  for (const f of SKILLS) {
-    const rule = section(read(f), 'Decisions');
-    for (const part of ADDED) assert.ok(rule.includes(part), `${f}: missing "${part}"`);
+test('the home skill carries each sentence of the strengthened rule', () => {
+  const rule = section(read(HOME), 'Decisions');
+  for (const part of ADDED) assert.ok(rule.includes(part), `${HOME}: missing "${part}"`);
+});
+
+test('every other skill refers to the rule and keeps its meaning', () => {
+  assert.ok(OTHERS.length >= 6);
+  for (const f of OTHERS) {
+    const ref = section(read(f), 'Decisions');
+    assert.ok(ref.includes('choice question (AskUserQuestion)'), `${f}: choice question missing`);
+    assert.match(ref, /risky branch is never settled by assuming/, f);
+    assert.ok(ref.includes(REF_PATH), `${f}: no path to the full rule`);
+    assert.ok(ref.includes('`## Decisions`'), `${f}: does not name the section`);
+    assert.ok(ref.split(/\s+/).length < 60, `${f}: reference grew into a copy of the rule`);
+  }
+});
+
+test('skills that ask often keep the practical details beside the reference', () => {
+  for (const f of OTHERS.filter(f => !RARE.includes(f))) {
+    const ref = section(read(f), 'Decisions');
+    assert.ok(ref.includes('Recommended option first, literal UTF-8, no prose questions at reply end, never postpone.'), f);
   }
 });
 
