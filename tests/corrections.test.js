@@ -86,11 +86,11 @@ function failures(scripts) {
     const g2 = tmp();
     spawnSync('git', ['init', '-q'], { cwd: g2 });
     const link = path.join(tmp(), 'link');
-    fs.symlinkSync(g2, link);
+    fs.symlinkSync(g2, link, 'junction'); // a junction needs no special right on Windows; ignored elsewhere
     r = add('fine sentence', { data: path.join(link, 'viaLink'), cwd: g2 });
     expect('symlink into repo refused', r.status !== 0 && !fs.existsSync(path.join(g2, 'viaLink')));
   } catch (err) {
-    if (err.code !== 'EPERM') throw err; // no symlink right on this system: skipped
+    if (err.code !== 'EPERM' && err.code !== 'EACCES') throw err; // no symlink right on this system: skipped
   }
   expect('repo stays empty', fs.readdirSync(repo).join() === '.haku');
 
@@ -150,7 +150,7 @@ test('mutation: writing inside the repository is caught', () => {
   assert.ok(failures(mutant(C, 'if (!insideRoot(root, dir)) continue;', 'continue;')).length > 0);
 });
 test('mutation: not resolving symlinks is caught', () => {
-  assert.ok(failures(mutant(C, 'try { return path.join(fs.realpathSync(cur), ...tail); }', 'try { throw new Error("x"); }')).length > 0);
+  assert.ok(failures(mutant(C, 'try { return path.join(trueName(cur), ...tail); }', 'try { throw new Error("x"); }')).length > 0);
 });
 test('mutation: clear that keeps the file is caught', () => {
   assert.ok(failures(mutant(C, "fs.rmSync(file, { force: true });", '')).length > 0);

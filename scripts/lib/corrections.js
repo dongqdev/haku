@@ -46,12 +46,19 @@ function dataDir(env = process.env) {
   return env.CLAUDE_PLUGIN_DATA || path.join(os.homedir(), '.haku');
 }
 
+// The real name of an existing path: symlinks and junctions resolved, and on Windows the 8.3 short names (RUNNER~1)
+// and letter case as the file system has them, which is the shape git prints. The "\\?\" prefix is dropped.
+function trueName(p) {
+  const real = (fs.realpathSync.native || fs.realpathSync)(p);
+  return real.replace(/^\\\\\?\\(?=[A-Za-z]:)/, '');
+}
+
 // Real path of the deepest existing part of `p` (symlinks resolved), the missing tail appended as written.
 function realish(p) {
   let cur = path.resolve(p);
   const tail = [];
   for (;;) {
-    try { return path.join(fs.realpathSync(cur), ...tail); } catch (err) { /* go up */ }
+    try { return path.join(trueName(cur), ...tail); } catch (err) { /* go up */ }
     const up = path.dirname(cur);
     if (up === cur) return path.resolve(p);
     tail.unshift(path.basename(cur));
