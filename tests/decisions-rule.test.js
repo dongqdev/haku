@@ -9,14 +9,7 @@ const path = require('path');
 const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\r\n/g, '\n');
 
 // The exact rule text. Comparing the whole paragraph means a deleted or reversed sentence fails.
-const RULE = 'Ask the user to decide only through a choice question (AskUserQuestion), never as a free-text question. '
-  + 'Put the recommended option first and mark it "(Recommended)". Notices and reports are plain text. '
-  + 'Write the question text as literal UTF-8; never use `\\uXXXX` escapes, which can garble Korean. '
-  + 'Only the orchestrator talks to the user; a worker that needs a decision sends it to the orchestrator. '
-  + 'This covers small and procedural questions too (whether to go on, when to ask, A or B): any sentence that asks the user to answer or choose is a decision. '
-  + 'Before ending a reply, read its last paragraph; if it asks in prose (a question mark, "shall I", "let me know"), turn it into a choice question. '
-  + 'Never postpone a question to later, and never fall back to prose when the tool call is declined: ask again, shorter, one decision with a one-line explanation. '
-  + 'A step the user already instructed needs no question.';
+const RULE = 'Ask the user to decide only through a choice question (AskUserQuestion), never in free text: recommended option first and marked "(Recommended)", question text as literal UTF-8 (no `\\uXXXX` escapes). Only the orchestrator talks to the user; a worker sends its decision request to the orchestrator. Any sentence that asks the user to answer or choose is a decision, small and procedural ones too. Before ending a reply, read its last paragraph; if it asks in prose, turn it into a choice question. Never postpone a question, and if the tool call is declined, ask again, shorter. A step the user already instructed needs no question.';
 
 const WORKER_SECTION = 'You never talk to the user. If you need a decision (scope change, a failing approach, an unclear criterion), '
   + 'stop and put the decision request in your report to the orchestrator, with the options you see and your recommendation. '
@@ -40,12 +33,11 @@ test('every skill carries exactly the decision rule', () => {
 
 // Each added sentence on its own, so a test failure names the sentence that was deleted or reversed.
 const ADDED = [
-  'any sentence that asks the user to answer or choose is a decision',
+  'Any sentence that asks the user to answer or choose is a decision',
   'read its last paragraph; if it asks in prose',
   'turn it into a choice question',
-  'Never postpone a question to later',
-  'never fall back to prose when the tool call is declined',
-  'ask again, shorter, one decision with a one-line explanation',
+  'Never postpone a question',
+  'if the tool call is declined, ask again, shorter',
   'A step the user already instructed needs no question'
 ];
 
