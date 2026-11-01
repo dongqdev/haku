@@ -2,6 +2,7 @@
 
 const { BASE_LABEL, typeLabel, kindLabel, WORK_KINDS, withPrefix, stripPrefix } = require('./model');
 const { WORKER_MODES } = require('./config');
+const { matcher } = require('./weaken');
 const { reasonProblem, hasHarnessLine, isOneLine } = require('./worker-mode');
 
 // GitHub rejects titles over 256 characters; the prefix adds up to 12, so a draft title may use 244.
@@ -132,6 +133,27 @@ function validateDraft(draft) {
   return errors;
 }
 
+// Shipped behaviour (skills, agents, scripts) always updates the docs and bumps the plugin version, so a task whose
+// scope names those folders but leaves out README.md, README.en.md or .claude-plugin/** gets flagged at the scope
+// check later (measured: 22 of 391 writes on 42 tasks). A warning, never an error: a draft may leave them out on purpose.
+const SHIPPED = /^(?:\.\/)?(?:skills|agents|scripts)(?:\/|$)/;
+const SHARED = ['README.md', 'README.en.md', '.claude-plugin/plugin.json'];
+
+function defaultScopeWarnings(draft) {
+  const warnings = [];
+  for (const m of (draft && draft.milestones) || []) {
+    for (const t of m.tasks || []) {
+      const globs = (Array.isArray(t.scope) ? t.scope : []).filter(g => typeof g === 'string');
+      const tests = globs.map(g => matcher(g, { anywhere: false }));
+      const covers = file => tests.some(f => f(file));
+      if (!globs.some(g => SHIPPED.test(g.trim()))) continue;
+      const missing = SHARED.filter(f => !covers(f));
+      if (missing.length) warnings.push(`task ${t.id}: scope changes shipped behaviour but leaves out ${missing.join(', ')} (docs and version bump); add them or leave as is on purpose`);
+    }
+  }
+  return warnings;
+}
+
 // Parents first; tasks ordered so every dependency is created before its dependent.
 function flatten(draft) {
   const nodes = [{ key: draft.story.id, type: 'story', node: draft.story, parent: null }];
@@ -192,6 +214,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   if (errors.length) return { ok: false, errors };
 
   const entries = flatten(draft);
+  const warnings = defaultScopeWarnings(draft);
   const numbers = new Map(Object.entries(state.numbers));
   const plan = entries.map(e => ({
     key: e.key,
@@ -201,7 +224,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     title: titlePrefix ? withPrefix(e.type, e.node.title) : e.node.title,
     exists: numbers.has(e.key)
   }));
-  if (!apply) return { ok: true, dryRun: true, plan, errors: [] };
+  if (!apply) return { ok: true, dryRun: true, plan, errors: [], warnings };
 
   const labelsFor = e => {
     const l = [BASE_LABEL, typeLabel(e.type)];
@@ -230,7 +253,7 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
     host.updateIssueBody(numbers.get(e.key), body);
   }
 
-  return { ok: true, dryRun: false, plan, errors: [], numbers: Object.fromEntries(numbers) };
+  return { ok: true, dryRun: false, plan, errors: [], warnings, numbers: Object.fromEntries(numbers) };
 }
 
-module.exports = { UNRESOLVED_MARKERS, findMarker, validateDraft, flatten, renderBody, publish };
+module.exports = { UNRESOLVED_MARKERS, findMarker, validateDraft, defaultScopeWarnings, flatten, renderBody, publish };
