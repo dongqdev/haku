@@ -39,4 +39,12 @@ function bumpProblems({ changedFiles, baseVersion, version }) {
   return [];
 }
 
-module.exports = { needsBump, compareVersions, manifestProblems, bumpProblems };
+// The version a PR should carry: the base's patch + 1 when shipped files changed and the current version
+// does not already beat the base; otherwise unchanged. Computed from the base, so it survives a rebase.
+function targetVersion({ changedFiles, baseVersion, version }) {
+  if (!needsBump(changedFiles) || compareVersions(version, baseVersion) > 0) return version;
+  const [major, minor, patch] = baseVersion.match(SEMVER).slice(1).map(Number);
+  return `${major}.${minor}.${patch + 1}`;
+}
+
+module.exports = { needsBump, compareVersions, manifestProblems, bumpProblems, targetVersion };

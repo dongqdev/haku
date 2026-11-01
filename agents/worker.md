@@ -23,6 +23,7 @@ Print the full pull request URL and your summary in your final message, not only
 ## Pitfalls
 
 - A subagent worktree has no `.haku-issue.md`; the brief holds the criteria and scope.
+- Never choose a version number by hand. After the last commit of a shipped change, run `node scripts/bump-version.js` (base `origin/main`), commit the two manifests, and run it again after any rebase.
 - A test never pins the current version to one value (check that the two manifests agree and are at least the base version); the next release bump would break it.
 - The guard blocks Bash strings that contain a remote-push command word, heredocs included. Write docs and test files with the Write tool.
 - Path and link code can break only on Windows: compare real paths with `fs.realpathSync.native`, normalise slashes, drive letter and case before comparing path strings, test directory links with `junction`, and skip just that case when a link cannot be created.
