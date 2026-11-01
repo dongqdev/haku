@@ -9,7 +9,7 @@
 **PR을 보내실 때**
 - 변경은 작게 하나씩. 한 PR은 한 가지 일만 합니다.
 - 테스트를 돌려 주세요: `node --test tests/*.test.js` (Node 18 이상, 설치할 패키지 없음). 고친 동작에는 그것을 확인하는 테스트를 같이 넣어 주세요.
-- `skills/`, `agents/`, `scripts/`, `.claude-plugin/`을 바꾸면 `.claude-plugin/plugin.json`과 `marketplace.json`의 **버전을 둘 다 올려야** 합니다. CI가 확인합니다. README, 테스트, `.github/`만 바꾸면 올리지 않습니다.
+- `skills/`, `agents/`, `scripts/`, `.claude-plugin/`을 바꾸면 `.claude-plugin/plugin.json`과 `marketplace.json`의 **버전을 둘 다 올려야** 합니다. CI가 확인합니다. 숫자를 직접 정하지 말고 커밋한 뒤 `node scripts/bump-version.js`(기본 기준은 `origin/main`)를 실행하세요. base 버전의 patch + 1로 두 파일을 맞추며, 리베이스 뒤에 다시 실행해도 안전합니다. README, 테스트, `.github/`만 바꾸면 올리지 않습니다.
 - 텍스트 파일은 LF 줄바꿈입니다(`.gitattributes`). 내 컴퓨터의 사용자 이름이 들어간 경로를 파일에 넣지 마세요(CI가 확인합니다).
 - PR 본문은 한글이나 영어로 써 주세요. 이 저장소의 작업용 PR은 한글 구역(요약, 이유, 변경 내용, 테스트, 위험과 영향)으로 쓰지만, 기여자에게는 강제하지 않습니다.
 
@@ -24,7 +24,7 @@ Thank you for your interest. Korean or English is fine.
 **When you send a pull request**
 - Keep it small: one pull request does one thing.
 - Run the tests: `node --test tests/*.test.js` (Node 18 or newer, nothing to install). Add a test for the behavior you fix.
-- If you change `skills/`, `agents/`, `scripts/` or `.claude-plugin/`, **raise the version in both** `.claude-plugin/plugin.json` and `marketplace.json`; CI checks it. Changes to the README, tests or `.github/` only need no bump.
+- If you change `skills/`, `agents/`, `scripts/` or `.claude-plugin/`, **raise the version in both** `.claude-plugin/plugin.json` and `marketplace.json`; CI checks it. Don't pick the number: commit, then run `node scripts/bump-version.js` (base defaults to `origin/main`); it sets both files to the base's patch + 1 and is safe to rerun after a rebase. Changes to the README, tests or `.github/` only need no bump.
 - Text files use LF line endings (`.gitattributes`). Do not put a path with your own user name in a file (CI checks this).
 - Write the pull request body in Korean or English. This repository's own task PRs use Korean sections (요약, 이유, 변경 내용, 테스트, 위험과 영향); that is not required of contributors.
 
