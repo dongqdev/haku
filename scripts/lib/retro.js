@@ -6,6 +6,7 @@ const { reportProblems, TRUSTED, MAX_CHARS } = require('./research');
 // built from code points so the file holds no line-separator characters
 const LINE_BREAKS = new RegExp('[\\r\\n' + String.fromCharCode(0x2028, 0x2029) + ']');
 const SKIP_PREFIX = 'retro를 하지 않기로 했습니다: ';
+const SKIP_NOTICE = '> 이 스토리의 회고(retro)는 건너뛰었습니다(하지 않았습니다). 아래는 건너뛴 사유입니다.';
 const NOTICE = '> 이 스토리의 회고(retro)를 마쳤습니다. 아래는 반영·등록·거절한 내용의 요약입니다.';
 
 // Leaves the record that a story's retro ran (or was dismissed): one comment on the closed story, the marker as its
@@ -28,7 +29,7 @@ function markRetroDone(host, storyNumber, text, options = {}) {
   const problems = reportProblems(body);
   if (problems.length) throw new Error(`the retro summary is not posted (${problems.length}): ${problems.slice(0, 5).join('; ')}. Remove it and try again`);
   if (hasTrustedRetro(host.listComments(storyNumber))) throw new Error(`#${storyNumber} already has a retro marker`);
-  host.commentIssue(storyNumber, `${RETRO_MARKER}\n${NOTICE}\n\n${body}`);
+  host.commentIssue(storyNumber, `${RETRO_MARKER}\n${options.skipped ? SKIP_NOTICE : NOTICE}\n\n${body}`);
   const counted = hasTrustedRetro(host.listComments(storyNumber));
   const result = { posted: true, counted, story: storyNumber, skipped: Boolean(options.skipped), chars: body.length };
   if (!counted) result.warning = 'the marker does not count: the posting account is not an owner, member or collaborator of the repository, so the story stays on the retro-due list';

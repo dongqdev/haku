@@ -268,3 +268,12 @@ test('issueShape returns closedAt and stateReason from a REST-shaped issue', () 
   assert.strictEqual(b.closedAt, null);
   assert.strictEqual(b.stateReason, null);
 });
+
+test('a skipped retro comment says it was skipped, never that it was finished', () => {
+  const host = fakeHost([issue(6, 'story', 'closed')]);
+  markRetroDone(host, 6, '', { skipped: true, reason: '범위가 작아서' });
+  const body = host.posted[0].b;
+  assert.match(body, /건너뛰었습니다/);
+  assert.doesNotMatch(body, /마쳤습니다/);
+  assert.ok(body.endsWith('retro를 하지 않기로 했습니다: 범위가 작아서'));
+});
