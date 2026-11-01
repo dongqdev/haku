@@ -28,6 +28,7 @@ function main(base) {
   ];
   if (problems.length) {
     for (const p of problems) console.error(`[version] ${p}`);
+    console.error(`[version] fix: run "node scripts/bump-version.js ${base}" and commit the two manifests`);
     return 1;
   }
   console.log(`[version] ok: ${baseVersion} -> ${plugin.version}`);
