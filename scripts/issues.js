@@ -31,7 +31,7 @@ const HELP = `haku issues
 
 Usage:
   issues.js publish <draft.json> [--apply] [--orchestrator <id>] [--repo <owner/repo>]
-  issues.js reconcile [--apply] [--json] [--repo <owner/repo>]
+  issues.js reconcile [--apply] [--only N,M | --except N,M] [--json] [--repo <owner/repo>]
   issues.js verify --profile <name> --base <ref> [--cwd <dir>] [--json]
   issues.js verify-record --issue <N> --kind <T1|T2|T3> --status <pass|fail> [--sha <sha>]
   issues.js summary --issue <N> --file <summary.md>
@@ -65,8 +65,9 @@ Usage:
 
 publish       Dry-run by default; --apply creates the story/milestone/task issues.
               Progress is kept in <draft>.map.json so an interrupted run resumes.
-reconcile     Dry-run by default; --apply closes merged-but-open tasks and rolls up. A parent whose closed task has no
-              merged pull request (open PR only, closed PR only, closed by hand, or not checkable) is held back.
+reconcile     Dry-run by default; --apply closes merged-but-open tasks and rolls up. --only N,M closes just those (a number
+              that is not in the plan is not closed and the reason is printed); --except N,M leaves those open. The guards still apply.
+              A parent whose closed task has no merged pull request (open PR only, closed PR only, closed by hand, or not checkable) is held back.
 accept-close  Records that the user closed a task on purpose without a merged PR, so its parent may roll up.
 verify        Exit 0 = pass, 1 = fail, 2 = review needed (see reasons).
 done-check    Exit 0 only when a worker may be deleted.
@@ -97,7 +98,7 @@ project-new   Dry-run by default; --apply creates the folder, the first commit a
 `;
 
 const VALUE = new Set(['--add', '--remove', '--repo', '--issue', '--title', '--profile', '--base', '--cwd', '--kind',
-  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story', '--text']);
+  '--status', '--sha', '--file', '--orchestrator', '--reason', '--branch', '--names', '--name', '--dir', '--owner', '--visibility', '--pr', '--mode', '--story', '--text', '--only', '--except']);
 
 function parse(argv) {
   const opts = { _: [] };
@@ -166,12 +167,22 @@ function main(argv) {
       return result.ok ? 0 : 1;
     }
     case 'reconcile': {
-      const result = reconcile(host(), { apply: Boolean(opts.apply) });
+      const numbers = (name, text) => {
+        if (text === undefined) return null;
+        const list = String(text).split(',').map(x => x.trim());
+        if (!list.length || !list.every(x => /^[1-9]\d*$/.test(x))) throw new Error(`${name} needs issue numbers like 5,8`);
+        return list.map(Number);
+      };
+      const only = numbers('--only', opts.only);
+      const except = numbers('--except', opts.except);
+      if (only && except) throw new Error('use --only or --except, not both');
+      const result = reconcile(host(), { apply: Boolean(opts.apply), only, except });
       if (opts.json) out(result);
       else {
         console.log(`reconcile against ${result.base}: ${result.dryRun ? 'dry-run (nothing closed)' : 'applied'}`);
         for (const p of result.plan) console.log(`  close #${p.issue}  [${p.kind}] ${p.reason}`);
         for (const w of result.warnings) console.log(`  warn  ${describeWarning(w)}`);
+        for (const n of result.notInPlan || []) console.log(`  skip  #${n.issue}: ${n.reason}`);
         if (!result.plan.length && !result.warnings.length) console.log('  nothing to do');
       }
       return 0;

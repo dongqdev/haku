@@ -54,7 +54,16 @@ function auditClosure(host, number, base, mergedAt) {
   }
 }
 
-function reconcile(host, { apply = false } = {}) {
+// only / except: lists of issue numbers (or null). Without them everything planned is closed. A left-out item is
+// never planned, so a parent that depends on it is held back by the same guards as an open child.
+function reconcile(host, { apply = false, only = null, except = null } = {}) {
+  const onlySet = only ? new Set(only) : null;
+  const exceptSet = new Set(except || []);
+  const declined = new Set();
+  const chosen = n => {
+    if (exceptSet.has(n) || (onlySet && !onlySet.has(n))) { declined.add(n); return false; }
+    return true;
+  };
   const base = host.defaultBranch();
   const issues = host.listIssues();
   const byNum = new Map(issues.map(i => [i.number, i]));
@@ -79,7 +88,7 @@ function reconcile(host, { apply = false } = {}) {
       const when = pr.mergedAt ? Date.parse(pr.mergedAt) : NaN;
       if (!Number.isNaN(when) && !(mergedAt.get(n) >= when)) mergedAt.set(n, when);
       if (issueType(issue) !== 'task') continue;
-      if (issue.state === 'open' && !planned.has(n)) {
+      if (issue.state === 'open' && !planned.has(n) && chosen(n)) {
         planned.add(n);
         plan.push({
           kind: 'merged-not-closed',
@@ -133,6 +142,7 @@ function reconcile(host, { apply = false } = {}) {
       const type = issueType(issue);
       if (type !== 'milestone' && type !== 'story') continue;
       if (issue.state !== 'open' || planned.has(issue.number)) continue;
+      if (declined.has(issue.number)) continue;
       const kids = children.get(issue.number) || [];
       if (kids.length === 0 || !kids.every(isDone)) continue;
       // The list can lag behind a child created moments ago. A child the parent's own checklist names but the
@@ -164,6 +174,7 @@ function reconcile(host, { apply = false } = {}) {
         holds.set(issue.number, { kind: incomplete ? 'audit-incomplete' : 'child-closed-without-merge', issue: issue.number, children: unverified.map(k => k.number), states });
         continue;
       }
+      if (!chosen(issue.number)) { holds.delete(issue.number); continue; }
       holds.delete(issue.number);
       planned.add(issue.number);
       plan.push({
@@ -186,6 +197,13 @@ function reconcile(host, { apply = false } = {}) {
     }
   }
 
+  // A number given to --only that the plan does not contain is not closed; say why.
+  const notInPlan = [];
+  for (const n of onlySet || []) {
+    if (planned.has(n)) continue;
+    notInPlan.push({ issue: n, reason: declined.has(n) ? 'excluded by --except' : 'not in the plan (nothing to close, or a guard holds it back)' });
+  }
+
   const applied = [];
   if (apply) {
     for (const item of plan) {
@@ -194,7 +212,7 @@ function reconcile(host, { apply = false } = {}) {
     }
   }
 
-  return { base, plan, warnings, applied, dryRun: !apply };
+  return { base, plan, warnings, applied, dryRun: !apply, ...(notInPlan.length ? { notInPlan } : {}) };
 }
 
 // One line of the text report for a warning; children, when there are any, are named so nobody has to
