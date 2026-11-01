@@ -31,3 +31,17 @@ test('the face is compact and the ears, face and mouth share one centre', () => 
   assert.strictEqual(ears.indexOf('___') + 1, 4);
   assert.strictEqual(mouth.indexOf('vvv') + 1, 4);
 });
+
+test('plan and build print a one-line mini banner that fits the column limit', () => {
+  for (const name of ['plan', 'build']) {
+    const text = fs.readFileSync(path.join(__dirname, '..', 'skills', name, 'SKILL.md'), 'utf8');
+    const m = text.match(/## Banner[\s\S]*?```text\n([\s\S]*?)```/);
+    assert.ok(m, `${name}: banner block missing`);
+    assert.strictEqual(m[1], `( o w o )  haku ${name}\n`);
+  }
+});
+
+test('the worker prints a one-line PR banner', () => {
+  const worker = fs.readFileSync(path.join(__dirname, '..', 'agents', 'worker.md'), 'utf8');
+  assert.match(worker, /\( o w o \)  haku PR ready #N/);
+});

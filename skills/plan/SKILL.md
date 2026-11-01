@@ -13,6 +13,14 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Recommended option first, literal UTF-8, no prose questions at reply end, never postpone. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
 
+## Banner
+
+Start by printing this one line once, exactly as written, then continue:
+
+```text
+( o w o )  haku plan
+```
+
 ## 1. Understand
 
 Read the repository (read-only) and the user's goal. Read `.haku/config.json` (assignee, maxWorkers, mergeMode, titlePrefix) from the repository root of the current checkout (that is the file `issues.js` itself reads) and `.haku/verify.json` from the **default branch** to learn which verify profiles exist. If either is missing, stop and point to `/haku:setup`. If the current folder is not a Git repository at all and the user is starting something new, `/haku:setup` starts the new-project flow (names, folder, remote repository); hand over to it instead of stopping.

@@ -13,6 +13,14 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Recommended option first, literal UTF-8, no prose questions at reply end, never postpone. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
 
+## Banner
+
+Start by printing this one line once, exactly as written, then continue:
+
+```text
+( o w o )  haku build
+```
+
 ## Loop
 
 1. **Pick ready tasks.** Open `type:task` children whose `Depends-On` issues are closed and whose `Scope` does not overlap a running task. Skip a task labelled `deferred` (the user postponed it) or `blocked`. Never exceed `maxWorkers`.
