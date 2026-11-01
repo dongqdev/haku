@@ -40,6 +40,13 @@ or as a prefix in the command. This is untested in a live session. A folder equa
 it (also through a symlink) is refused, so a record cannot end up in a commit. The file lives outside the
 repository, and records of all repositories that use the same folder share one `scope-violations.jsonl`.
 
+### Ask mode (`--ask`, optional)
+
+Add `"--ask"` to `args` and the hook also prints `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"ask","permissionDecisionReason":"..."}}`
+for a confirmed violation, so Claude Code asks you before that write. It still exits 0 and never denies; you can allow
+the write. Nothing is printed for writes inside the scope, broken input or a non-haku folder. Output format is covered
+by `tests/hook-scope-check.test.js`; the live-session behaviour is not yet seen in a real session.
+
 ### What is recorded
 
 One JSON line per violation in `$CLAUDE_PLUGIN_DATA/scope-violations.jsonl`:
