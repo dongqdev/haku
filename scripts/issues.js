@@ -230,6 +230,7 @@ function main(argv) {
         repo: opts.repo || null,
         base: opts.base || h.defaultBranch(),
         settings: workerSettings(cfg.config),
+        linkFromMain: linkFromMain(cfg.config),
         pluginRoot: path.resolve(__dirname, '..')
       }));
       return 0;

@@ -58,7 +58,7 @@ function readConfig(cwd = process.cwd()) {
 }
 
 // Names to link from the main checkout into a worker worktree (for example "node_modules").
-const validLinkName = n => typeof n === 'string' && n.trim() && !path.isAbsolute(n) && !n.split(/[\\/]/).includes('..') && !n.split(/[\\/]/).includes('.git') && !/^\.?$/.test(n);
+const validLinkName = n => typeof n === 'string' && n === n.trim() && !/[\\/]$/.test(n) && !n.startsWith('./') && !path.isAbsolute(n) && !n.split(/[\\/]/).includes('..') && !n.split(/[\\/]/).includes('.git') && !/^\.?$/.test(n);
 const validLinkList = l => Array.isArray(l) && l.every(validLinkName);
 const linkFromMain = config => (validLinkList(config.linkFromMain) ? config.linkFromMain : []);
 

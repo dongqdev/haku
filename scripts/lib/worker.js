@@ -69,14 +69,23 @@ function updateRecord(cwd, issue, patch) {
 // worker-rm uncommitted-file check away from it. Names missing in the main checkout are skipped.
 function linkDependencies(cwd, dir, names) {
   const linked = [];
-  const top = git(cwd, ['rev-parse', '--show-toplevel']);
+  // The main checkout, even when cwd is itself a linked worktree.
+  const top = path.dirname(path.resolve(cwd, git(cwd, ['rev-parse', '--git-common-dir'])));
   for (const name of names) {
     const src = path.resolve(top, name);
     const dest = path.resolve(dir, name);
-    if (path.relative(top, src).startsWith('..') || !fs.existsSync(src) || fs.existsSync(dest)) continue;
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.symlinkSync(src, dest, process.platform === 'win32' ? 'junction' : 'dir');
-    linked.push(name);
+    // A symlinked parent could point outside the repository: only real paths inside it are linked.
+    let real;
+    try { real = fs.realpathSync(src); } catch (e) { continue; }
+    if (path.relative(fs.realpathSync(top), real).startsWith('..') || path.relative(top, src).startsWith('..') || fs.existsSync(dest)) continue;
+    // A convenience must not abort worker creation: a link that cannot be made is skipped.
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.symlinkSync(src, dest, process.platform === 'win32' ? 'junction' : 'dir');
+      linked.push(name);
+    } catch (e) {
+      console.error(`[haku] warning: could not link ${name} into the worktree: ${e.message}`);
+    }
   }
   if (linked.length) {
     const exclude = path.resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'info/exclude']));

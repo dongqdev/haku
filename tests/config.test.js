@@ -112,3 +112,10 @@ test('linkFromMain accepts plain names and rejects paths that leave the reposito
   assert.deepStrictEqual(linkFromMain({ linkFromMain: ['.git'] }), []);
   assert.deepStrictEqual(linkFromMain({}), []);
 });
+
+test('linkFromMain rejects trailing slashes, ./ prefixes and padded names', () => {
+  const { linkFromMain } = require('../scripts/lib/config');
+  for (const bad of ['node_modules/', './node_modules', ' node_modules', '.']) {
+    assert.deepStrictEqual(linkFromMain({ linkFromMain: [bad] }), [], bad);
+  }
+});
