@@ -154,3 +154,36 @@ test('sniff skill: open questions carry the marker and are still saved', () => {
   assert.ok(s.includes('`plan` resolves them first'));
   assert.ok(s.includes('Items the user explicitly leaves open stay marked.'));
 });
+
+const { spawnSync } = require('node:child_process');
+const os = require('node:os');
+
+test('variants of the marker are caught: no space, extra spaces, full-width brackets, line break, case', () => {
+  const { findMarker } = require('../scripts/lib/publish');
+  for (const v of ['[확인필요]', '[확인  필요]', '［확인 필요］', '[확인\n필요]', '[needs clarification]', '[NEEDS   CLARIFICATION]']) {
+    assert.ok(findMarker(`text ${v} text`), v);
+  }
+  for (const ok of ['확인 필요', '[확인]', 'needs clarification', '(확인 필요)']) assert.strictEqual(findMarker(ok), null, ok);
+});
+
+test('a marker in a task id is refused', () => {
+  const d = draft();
+  t2(d).id = `T2 ${KO}`;
+  const errors = validateDraft(d);
+  assert.ok(errors.some(e => /id still has an unresolved marker/.test(e)));
+});
+
+test('issues.js publish exits 1 and names the marker when a draft still has one', () => {
+  const d = draft();
+  d.story.body = `why ${EN}`;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'eh-marker-'));
+  const file = path.join(dir, 'draft.json');
+  fs.writeFileSync(file, JSON.stringify(d));
+  const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'issues.js'), 'publish', file], { encoding: 'utf8' });
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stdout, /unresolved marker/);
+  const clean = draft();
+  fs.writeFileSync(file, JSON.stringify(clean));
+  const ok = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'issues.js'), 'publish', file], { encoding: 'utf8' });
+  assert.strictEqual(ok.status, 0);
+});

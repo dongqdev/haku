@@ -15,11 +15,15 @@ const KINDS = ['T1', 'T2', 'T3'];
 // (no closing bracket, or no brackets) is deliberately not a marker.
 const UNRESOLVED_MARKERS = ['[확인 필요]', '[NEEDS CLARIFICATION]'];
 
-// Returns the first marker found in the text, or null.
+// Returns the first marker found in the text, or null. The text is compared in a normalised form so that spacing
+// and width variants are caught too: full-width brackets (NFKC), no space or several spaces or a line break inside
+// the marker, any letter case. A bracketed phrase in other words is not a marker (see the plan skill for how to
+// mention the marker itself).
+const squash = t => t.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
 function findMarker(text) {
   if (typeof text !== 'string') return null;
-  const lower = text.toLowerCase();
-  return UNRESOLVED_MARKERS.find(m => lower.includes(m.toLowerCase())) || null;
+  const flat = squash(text);
+  return UNRESOLVED_MARKERS.find(m => flat.includes(squash(m))) || null;
 }
 
 // A draft is the locally written, user-approved plan:
@@ -76,6 +80,8 @@ function validateDraft(draft) {
     if (node.verify) markerCheck(where, 'verify.profile', node.verify.profile);
   };
   const uniq = (where, id) => {
+    const m = findMarker(id);
+    if (m) errors.push(`${where}: id still has an unresolved marker ${m}`);
     if (!id) errors.push(`${where}: id is required`);
     else if (ids.has(id)) errors.push(`${where}: duplicate id ${id}`);
     else ids.add(id);
