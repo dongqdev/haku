@@ -170,7 +170,8 @@ function main(argv) {
           apply: Boolean(opts.apply),
           state,
           orchestrator: opts.orchestrator || null,
-        titlePrefix: titlePrefixOn(cfg.config)
+          titlePrefix: titlePrefixOn(cfg.config),
+          files: opts.apply ? null : defaultBranchFiles()
         });
       } finally {
         // Save progress even when publish throws midway, so a retry resumes instead of duplicating.
