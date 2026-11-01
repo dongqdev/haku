@@ -513,3 +513,42 @@ test('a task named by two parents is reported once', () => {
   const holds = reconcile(host).warnings.filter(w => w.kind === 'child-closed-without-merge');
   assert.deepStrictEqual(holds.map(w => [w.issue, w.children]), [[1, [3]]]);
 });
+
+const twoMerged = () => fakeHost({
+  issues: [issue(3, 'task'), issue(4, 'task')],
+  prs: [
+    { number: 10, body: '', headRefName: 'task/3-a', closingIssues: [] },
+    { number: 11, body: '', headRefName: 'task/4-b', closingIssues: [] }
+  ]
+});
+
+test('--only closes just the chosen issues and explains a number that is not in the plan', () => {
+  const host = twoMerged();
+  const r = reconcile(host, { apply: true, only: [3, 99] });
+  assert.deepStrictEqual(host.closed.map(c => c.n), [3]);
+  assert.deepStrictEqual(r.notInPlan.map(n => n.issue), [99]);
+  assert.match(r.notInPlan[0].reason, /not in the plan/);
+});
+
+test('--except leaves the chosen issues open; no option behaves as before', () => {
+  let host = twoMerged();
+  reconcile(host, { apply: true, except: [4] });
+  assert.deepStrictEqual(host.closed.map(c => c.n), [3]);
+  host = twoMerged();
+  const r = reconcile(host, { apply: true });
+  assert.deepStrictEqual(host.closed.map(c => c.n), [3, 4]);
+  assert.strictEqual(r.notInPlan, undefined);
+});
+
+test('a parent is not rolled up while one of its tasks is left out', () => {
+  const host = fakeHost({
+    issues: [issue(2, 'story'), issue(3, 'task', 'open', 'Parent: #2'), issue(4, 'task', 'open', 'Parent: #2')],
+    prs: [
+      { number: 10, body: '', headRefName: 'task/3-a', closingIssues: [] },
+      { number: 11, body: '', headRefName: 'task/4-b', closingIssues: [] }
+    ]
+  });
+  const r = reconcile(host, { apply: true, except: [4] });
+  assert.deepStrictEqual(host.closed.map(c => c.n), [3]);
+  assert.ok(!r.plan.some(p => p.issue === 2));
+});
