@@ -63,7 +63,49 @@ function updateRecord(cwd, issue, patch) {
   return { ...record, ...patch };
 }
 
-function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT_MAX_WORKERS }) {
+// Links git-ignored dependency folders (node_modules ...) from the main checkout into a fresh worktree so the
+// worker's tests and `verify --cwd` run without setup. A symlink is not matched by a "node_modules/" ignore rule,
+// so the name is added to the repository's local info/exclude (never committed) to keep `git add -A` and the
+// worker-rm uncommitted-file check away from it. Names missing in the main checkout are skipped.
+function linkDependencies(cwd, dir, names) {
+  const linked = [];
+  // The main checkout, even when cwd is itself a linked worktree.
+  const top = path.dirname(path.resolve(cwd, git(cwd, ['rev-parse', '--git-common-dir'])));
+  for (const name of names) {
+    const src = path.resolve(top, name);
+    const dest = path.resolve(dir, name);
+    // A symlinked parent could point outside the repository: only real paths inside it are linked.
+    let real;
+    try { real = fs.realpathSync(src); } catch (e) { continue; }
+    if (path.relative(fs.realpathSync(top), real).startsWith('..') || path.relative(top, src).startsWith('..') || fs.existsSync(dest)) continue;
+    // A convenience must not abort worker creation: a link that cannot be made is skipped.
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.symlinkSync(src, dest, process.platform === 'win32' ? 'junction' : 'dir');
+      linked.push(name);
+    } catch (e) {
+      console.error(`[haku] warning: could not link ${name} into the worktree: ${e.message}`);
+    }
+  }
+  if (linked.length) {
+    const exclude = path.resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'info/exclude']));
+    fs.mkdirSync(path.dirname(exclude), { recursive: true });
+    const have = fs.existsSync(exclude) ? fs.readFileSync(exclude, 'utf8').split('\n') : [];
+    const add = linked.map(n => `/${n.replace(/\\/g, '/')}`).filter(l => !have.includes(l));
+    if (add.length) fs.appendFileSync(exclude, `${have.length && have[have.length - 1] !== '' ? '\n' : ''}${add.join('\n')}\n`);
+  }
+  return linked;
+}
+
+// Removes only the links startWorker made (and only if they are still symlinks): the main checkout's folders stay.
+function unlinkDependencies(dir, names) {
+  for (const name of names || []) {
+    const p = path.join(dir, name);
+    try { if (fs.lstatSync(p).isSymbolicLink()) fs.unlinkSync(p); } catch (e) { /* already gone */ }
+  }
+}
+
+function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT_MAX_WORKERS, linkFromMain = [] }) {
   const found = host ? assertTaskIssue(host, issue) : null;
   const existing = listWorkers(cwd);
   if (existing.some(w => w.issue === issue)) throw new Error(`worker for #${issue} already exists`);
@@ -79,7 +121,8 @@ function startWorker({ cwd, issue, title, base, home, host, maxWorkers = DEFAULT
   // The Scope as the task declared it when work began: the worker can edit the issue later, so the merge check
   // compares against this copy.
   const scope = found ? scopeOf(found.body) : null;
-  const record = { issue, branch, path: dir, base, startedAt: new Date().toISOString(), ...(scope ? { scope } : {}) };
+  const linked = linkDependencies(cwd, dir, linkFromMain);
+  const record = { issue, branch, path: dir, base, startedAt: new Date().toISOString(), ...(scope ? { scope } : {}), ...(linked.length ? { linked } : {}) };
   const rdir = recordDir(cwd);
   fs.mkdirSync(rdir, { recursive: true });
   fs.writeFileSync(path.join(rdir, `worker-${issue}.json`), JSON.stringify(record, null, 2));
@@ -235,6 +278,7 @@ function removeWorker({ cwd, issue, gate, abandon = false, discard = false, dele
     throw new Error(`refusing to delete worker #${issue}; the worktree changed while it was being checked (a session or a subagent was still working), so nothing was deleted (run worker-rm again to check the new state)`);
   }
 
+  if (present) unlinkDependencies(record.path, record.linked);
   if (present) git(cwd, ['worktree', 'remove', '--force', record.path]);
   else git(cwd, ['worktree', 'prune']);
   // Squash/rebase merges leave the branch unmerged from git's point of view, hence -D.

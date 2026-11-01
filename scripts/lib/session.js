@@ -203,10 +203,10 @@ function stopSession({ id, claudeBin = claudeCommand(), spawn = spawnSync }) {
 // Worktree + branch + session in one step. If anything after the worktree exists fails, the session (which may
 // exist even when its id could not be read, so it is also looked up by name) is ended first and the fresh
 // worktree is removed again, so a failed launch leaves nothing behind.
-function launchWorker({ host, cwd, issue, orchestrator, repo = null, base, home, settings = {}, pluginRoot, claudeBin, spawn }) {
+function launchWorker({ host, cwd, issue, orchestrator, repo = null, base, home, settings = {}, linkFromMain = [], pluginRoot, claudeBin, spawn }) {
   if (!orchestrator) throw new Error('--orchestrator <your session name> is required: the worker reports to it');
   const found = host.getIssue(issue);
-  const record = startWorker({ cwd, issue, title: stripPrefix(found.title), base, home, host });
+  const record = startWorker({ cwd, issue, title: stripPrefix(found.title), base, home, host, linkFromMain });
   const name = `[Worker ${issue}] ${cut(stripPrefix(found.title).replace(/\s+/g, ' '), 60)}`;
   const issueFile = path.join(record.path, ISSUE_FILE);
   let session = null;

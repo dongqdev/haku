@@ -124,6 +124,8 @@ Claude Code는 설치된 플러그인을 **버전**을 키로 하는 캐시에 �
 
 haku는 고정된 색으로 라벨을 만듭니다. 색조는 Okabe-Ito 팔레트(색각 차이가 있어도 구별됨)에서 가져와 GitHub가 흰 글씨를 쓰도록 어둡게 했고, 기본 라벨에는 마스코트의 갈색을 씁니다. `haku` 갈색, `type:story` 파랑, `type:milestone` 초록, `type:task` 주황, `sprint:*` 보라, `owner:*` 슬레이트, `kind:*`(design, dev, bug, docs, research, chore: 어떤 종류의 일인지)와 상태 라벨 `deferred`, `blocked`, `needs-user`(이슈가 왜 멈춰 있는지)이며, `issues.js labels`와 `issues.js label`로 관리하고, 각각 짧은 설명이 붙습니다. (GitHub는 배경의 밝기로 글자색을 스스로 고르므로, 흰 글씨는 배경을 어둡게 해서 얻습니다.) 이슈 제목에는 `[Story]`, `[Milestone]`, `[Task]` 접두사가 붙어서 색 없이도 종류를 읽을 수 있습니다. 접두사를 끄려면 `.haku/config.json`에 `"titlePrefix": false`를 두세요. 이미 있는 라벨은 haku가 다음에 확인할 때 색이 갱신됩니다(`gh label create --force`).
 
+워커 워크트리에는 git이 무시하는 `node_modules` 같은 폴더가 없어 처음 테스트가 실패합니다. `.haku/config.json`에 `"linkFromMain": ["node_modules"]`를 두면 `worker-start`가 메인 체크아웃의 그 폴더를 워크트리에 심볼릭 링크로 걸고(저장소의 로컬 `info/exclude`에 올려 커밋·정리 검사에 걸리지 않게 함), `worker-rm`은 링크만 지우며 메인 폴더는 건드리지 않습니다. 이 목록은 저장소 안의 평범한 폴더 이름만 받고 이슈 본문의 명령은 실행하지 않습니다.
+
 </details>
 
 <details>

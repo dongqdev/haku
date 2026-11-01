@@ -16,7 +16,7 @@ const { planLabelChange, ensureBaseLabels } = require('./lib/labels');
 const { effectiveWorkerMode, launchGate } = require('./lib/worker-mode');
 const { postResearch, trustedResearch } = require('./lib/research');
 const { markRetroDone, retroDue, retroForStatus, renderRetroDue } = require('./lib/retro');
-const { readConfig, titlePrefixOn, workerSettings } = require('./lib/config');
+const { readConfig, linkFromMain, titlePrefixOn, workerSettings } = require('./lib/config');
 const { launchWorker, stopOnly, removeSession, withSessionStates } = require('./lib/session');
 const { skeleton, checkBody, checkClosingLink } = require('./lib/pr-body');
 const { buildStatus, renderStatus } = require('./lib/status');
@@ -208,7 +208,10 @@ function main(argv) {
     case 'worker-start': {
       needIssue(opts);
       if (!opts.title || !opts.base) throw new Error('--title and --base are required');
-      out(startWorker({ cwd: opts.cwd || process.cwd(), issue: opts.issue, title: opts.title, base: opts.base, host: host() }));
+      const cwd = opts.cwd || process.cwd();
+      const cfg = readConfig(cwd);
+      for (const w of cfg.warnings) console.error(`[haku] warning: ${w}`);
+      out(startWorker({ cwd, issue: opts.issue, title: opts.title, base: opts.base, host: host(), linkFromMain: linkFromMain(cfg.config) }));
       return 0;
     }
     case 'worker-launch': {
@@ -227,6 +230,7 @@ function main(argv) {
         repo: opts.repo || null,
         base: opts.base || h.defaultBranch(),
         settings: workerSettings(cfg.config),
+        linkFromMain: linkFromMain(cfg.config),
         pluginRoot: path.resolve(__dirname, '..')
       }));
       return 0;
