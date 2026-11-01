@@ -178,3 +178,25 @@ test('mutation: not resolving symlinks is caught', () => {
   const s = mutant(d => patch(d, 'scripts/lib/hook-common.js', 'return path.join(fs.realpathSync(cur), ...tail);', 'return path.join(cur, ...tail);'));
   assert.ok(failures(s).length > 0);
 });
+
+// --ask mode: Claude Code reads {hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'ask'}} from stdout
+// at exit 0. Inside the scope, on broken input and without the flag, nothing is printed.
+test('--ask answers permissionDecision ask only for a confirmed violation, always exit 0', () => {
+  const r = repo('docs/**');
+  const ask = (input, cwd) => spawnSync(process.execPath, [HOOK, '--ask'], { input, cwd: cwd || r, encoding: 'utf8' });
+  let res = ask(payload(r, path.join(r, 'src', 'y.js')));
+  assert.strictEqual(res.status, 0);
+  const out = JSON.parse(res.stdout);
+  assert.strictEqual(out.hookSpecificOutput.hookEventName, 'PreToolUse');
+  assert.strictEqual(out.hookSpecificOutput.permissionDecision, 'ask');
+  assert.ok(out.hookSpecificOutput.permissionDecisionReason.includes('src/y.js'));
+  assert.ok(!res.stdout.includes('SECRET'));
+  res = ask(payload(r, path.join(r, 'docs', 'x.md')));
+  assert.deepStrictEqual([res.status, res.stdout], [0, '']);
+  for (const junk of ['{not json', '', 'null']) {
+    res = ask(junk);
+    assert.deepStrictEqual([res.status, res.stdout], [0, '']);
+  }
+  res = spawnSync(process.execPath, [HOOK], { input: payload(r, path.join(r, 'src', 'y.js')), cwd: r, encoding: 'utf8' });
+  assert.deepStrictEqual([res.status, res.stdout], [0, '']);
+});
