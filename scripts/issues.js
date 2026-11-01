@@ -129,6 +129,19 @@ function parse(argv) {
 // How a worker's session is ended: stopped first (the conversation is kept), deleted once the worktree is gone.
 const SESSIONS = { stop: id => stopOnly({ id }), remove: id => removeSession({ id }) };
 
+// Every file path of the default branch (local clone), to check a draft's Scope names. null when it cannot be read:
+// the check is then skipped rather than guessed.
+function defaultBranchFiles() {
+  const tryGit = args => spawnSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const head = tryGit(['symbolic-ref', '-q', '--short', 'refs/remotes/origin/HEAD']);
+  const candidates = [head.status === 0 ? head.stdout.trim() : null, 'origin/main', 'origin/master', 'main', 'master'].filter(Boolean);
+  for (const ref of candidates) {
+    const r = tryGit(['ls-tree', '-r', '--name-only', ref]);
+    if (r.status === 0) return r.stdout.split('\n').filter(Boolean);
+  }
+  return null;
+}
+
 const out = obj => process.stdout.write(`${JSON.stringify(obj, null, 2)}\n`);
 
 function needIssue(opts) {

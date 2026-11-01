@@ -107,6 +107,7 @@ function validateDraft(draft) {
       need(Array.isArray(t.scope) && t.scope.length > 0, `${where}: scope (files this task may touch) is required`);
       checkVerify(where, t.verify);
       checkKind(where, t);
+      if (t.newFiles !== undefined && !(Array.isArray(t.newFiles) && t.newFiles.every(isOneLine))) errors.push(`${where}: newFiles must be a list of plain one-line paths`);
       bodyCheck(where, t);
       markerNode(where, t);
       (Array.isArray(t.acceptance) ? t.acceptance : []).forEach((a, i) => markerCheck(where, `acceptance[${i}]`, a));
@@ -149,6 +150,32 @@ function defaultScopeWarnings(draft) {
       if (!globs.some(g => SHIPPED.test(g.trim()))) continue;
       const missing = SHARED.filter(f => !covers(f));
       if (missing.length) warnings.push(`task ${t.id}: scope changes shipped behaviour but leaves out ${missing.join(', ')} (docs and version bump); add them or leave as is on purpose`);
+    }
+  }
+  return warnings;
+}
+
+// A scope entry without wildcards names one file; if the default branch has no such file (and the task does not
+// list it in newFiles) the draft probably misspells it (vite.config.js vs vite.config.mjs). A warning, never an error.
+// files: every path of the default branch tree. A same-folder file that differs only by extension is suggested.
+const hasWildcard = g => /[*?\[{]/.test(g);
+function missingPathWarnings(draft, files) {
+  const warnings = [];
+  if (!Array.isArray(files)) return warnings;
+  const have = new Set(files);
+  const stem = f => f.replace(/\.[^./]+$/, '');
+  for (const m of (draft && draft.milestones) || []) {
+    for (const t of m.tasks || []) {
+      const fresh = new Set((Array.isArray(t.newFiles) ? t.newFiles : []).map(x => String(x).replace(/^\.\//, '')));
+      for (const raw of Array.isArray(t.scope) ? t.scope : []) {
+        if (typeof raw !== 'string') continue;
+        const g = raw.trim().replace(/^\.\//, '');
+        // A folder entry (trailing slash, or an existing folder prefix) and wildcard entries are not compared.
+        if (!g || hasWildcard(g) || g.endsWith('/') || fresh.has(g) || have.has(g)) continue;
+        if (files.some(f => f.startsWith(`${g}/`))) continue;
+        const sibling = files.filter(f => f !== g && stem(f) === stem(g) && f.slice(0, f.lastIndexOf('/') + 1) === g.slice(0, g.lastIndexOf('/') + 1));
+        warnings.push(`task ${t.id}: scope "${g}" is not on the default branch${sibling.length ? ` (did you mean ${sibling.join(', ')}?)` : ''}; fix the name, or list it in the task's newFiles if the task creates it`);
+      }
     }
   }
   return warnings;
@@ -209,12 +236,12 @@ function renderBody(entry, numbers, children = []) {
 
 // state.numbers persists draftId -> issue number so an interrupted publish resumes
 // without creating duplicates.
-function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null, titlePrefix = true } = {}) {
+function publish(host, draft, { apply = false, state = { numbers: {} }, orchestrator = null, titlePrefix = true, files = null } = {}) {
   const errors = validateDraft(draft);
   if (errors.length) return { ok: false, errors };
 
   const entries = flatten(draft);
-  const warnings = defaultScopeWarnings(draft);
+  const warnings = [...defaultScopeWarnings(draft), ...missingPathWarnings(draft, files)];
   const numbers = new Map(Object.entries(state.numbers));
   const plan = entries.map(e => ({
     key: e.key,
@@ -256,4 +283,4 @@ function publish(host, draft, { apply = false, state = { numbers: {} }, orchestr
   return { ok: true, dryRun: false, plan, errors: [], warnings, numbers: Object.fromEntries(numbers) };
 }
 
-module.exports = { UNRESOLVED_MARKERS, findMarker, validateDraft, defaultScopeWarnings, flatten, renderBody, publish };
+module.exports = { UNRESOLVED_MARKERS, findMarker, validateDraft, defaultScopeWarnings, missingPathWarnings, flatten, renderBody, publish };
