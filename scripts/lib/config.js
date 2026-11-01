@@ -51,8 +51,16 @@ function readConfig(cwd = process.cwd()) {
   if ('workerRemoteControl' in config && typeof config.workerRemoteControl !== 'boolean') {
     warnings.push(`workerRemoteControl in ${file} must be true or false; it stays on`);
   }
+  if ('linkFromMain' in config && !validLinkList(config.linkFromMain)) {
+    warnings.push(`linkFromMain in ${file} must be a list of plain folder names inside the repository (no "..", no absolute paths); it is ignored`);
+  }
   return { config, warnings, file };
 }
+
+// Names to link from the main checkout into a worker worktree (for example "node_modules").
+const validLinkName = n => typeof n === 'string' && n.trim() && !path.isAbsolute(n) && !n.split(/[\\/]/).includes('..') && !n.split(/[\\/]/).includes('.git') && !/^\.?$/.test(n);
+const validLinkList = l => Array.isArray(l) && l.every(validLinkName);
+const linkFromMain = config => (validLinkList(config.linkFromMain) ? config.linkFromMain : []);
 
 const WORKER_MODES = ['subagent', 'session'];
 // Modes that keep asking or restrict the worker. Approval-skipping modes are deliberately absent.
@@ -71,4 +79,4 @@ function workerSettings(config) {
 // Only a real boolean false switches the prefix off.
 const titlePrefixOn = config => config.titlePrefix !== false;
 
-module.exports = { readConfig, repoRoot, titlePrefixOn, workerSettings, WORKER_MODES, SAFE_PERMISSION_MODES };
+module.exports = { readConfig, linkFromMain, repoRoot, titlePrefixOn, workerSettings, WORKER_MODES, SAFE_PERMISSION_MODES };

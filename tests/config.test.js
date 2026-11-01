@@ -103,3 +103,12 @@ test('the branch command names the branch from the title without its kind prefix
   const r = spawnSync(process.execPath, [cli, 'branch', '--issue', '5', '--title', '[Task] Model'], { encoding: 'utf8' });
   assert.strictEqual(r.stdout.trim(), 'task/5-model');
 });
+
+test('linkFromMain accepts plain names and rejects paths that leave the repository', () => {
+  const { linkFromMain } = require('../scripts/lib/config');
+  assert.deepStrictEqual(linkFromMain({ linkFromMain: ['node_modules', 'web/node_modules'] }), ['node_modules', 'web/node_modules']);
+  assert.deepStrictEqual(linkFromMain({ linkFromMain: ['../x'] }), []);
+  assert.deepStrictEqual(linkFromMain({ linkFromMain: ['/etc'] }), []);
+  assert.deepStrictEqual(linkFromMain({ linkFromMain: ['.git'] }), []);
+  assert.deepStrictEqual(linkFromMain({}), []);
+});

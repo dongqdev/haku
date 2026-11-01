@@ -153,3 +153,20 @@ test('start refuses a pull request and an issue that is not a haku issue, even w
   assert.throws(() => startWorker({ cwd: repo, issue: 51, title: 'x', base: 'main', home, host }), /issue #51 is not a haku issue/);
   assert.strictEqual(startWorker({ cwd: repo, issue: 52, title: 'x', base: 'main', home, host }).issue, 52);
 });
+
+test('linkFromMain links dependency folders, keeps them out of status, and worker-rm leaves the main copy', () => {
+  const { repo, home } = setup();
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n');
+  sh(repo, 'add', '-A');
+  sh(repo, 'commit', '-q', '-m', 'ignore');
+  fs.mkdirSync(path.join(repo, 'node_modules'));
+  fs.writeFileSync(path.join(repo, 'node_modules', 'dep.txt'), 'x');
+  const w = startWorker({ cwd: repo, issue: 9, title: 'deps', base: 'main', home, linkFromMain: ['node_modules', 'missing'] });
+  assert.deepStrictEqual(w.linked, ['node_modules']);
+  assert.ok(fs.existsSync(path.join(w.path, 'node_modules', 'dep.txt')));
+  assert.strictEqual(sh(w.path, 'status', '--porcelain'), '');
+  const gate = { ok: true, prHead: sh(repo, 'rev-parse', w.branch) };
+  removeWorker({ cwd: repo, issue: 9, gate });
+  assert.ok(!fs.existsSync(w.path));
+  assert.ok(fs.existsSync(path.join(repo, 'node_modules', 'dep.txt')));
+});

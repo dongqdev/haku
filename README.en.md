@@ -124,6 +124,8 @@ Before a merge approval, a read-only `reviewer` agent (it can only read) checks 
 
 haku creates its labels with fixed colours: hues from the Okabe-Ito palette (distinguishable with colour-vision differences), darkened so GitHub shows white label text, and the mascot's brown for the base label. `haku` brown, `type:story` blue, `type:milestone` green, `type:task` orange, `sprint:*` purple, `owner:*` slate, `kind:*` (design, dev, bug, docs, research, chore: what kind of work it is) and the state labels `deferred`, `blocked`, `needs-user` (why an issue is not moving), managed with `issues.js labels` and `issues.js label`, each with a short description. (GitHub picks the text colour itself from the background's lightness, so white text is reached by darker backgrounds.) Issue titles get a kind prefix, `[Story]`, `[Milestone]` or `[Task]`, so the kind reads without colour; set `"titlePrefix": false` in `.haku/config.json` to switch the prefix off. Existing labels get their colour updated the next time haku ensures them (`gh label create --force`).
 
+A worker worktree lacks git-ignored folders such as `node_modules`, so its first test run fails. Put `"linkFromMain": ["node_modules"]` in `.haku/config.json` and `worker-start` symlinks those folders from the main checkout into the worktree (listed in the repository's local `info/exclude`, so commits and the cleanup check ignore them); `worker-rm` removes only the link and never touches the main folder. The list accepts plain folder names inside the repository, and no command from an issue body is ever run.
+
 </details>
 
 <details>
