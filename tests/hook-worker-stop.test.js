@@ -43,3 +43,10 @@ test('without stop_hook_active in the input it blocks an agent once, then passes
   assert.strictEqual(run(one).status, 0);
   assert.strictEqual(run(JSON.stringify({ agent_type: 'worker', last_assistant_message: 'done.' })).status, 0);
 });
+
+test('the session id alone is never a key: other workers of the same session are not skipped', () => {
+  const s = o => JSON.stringify({ session_id: 'sess', agent_type: 'worker', last_assistant_message: 'done.', ...o });
+  assert.strictEqual(run(s({})).status, 0);
+  assert.strictEqual(run(s({ agent_id: 'w-one' })).status, 2);
+  assert.strictEqual(run(s({ agent_id: 'w-two' })).status, 2);
+});

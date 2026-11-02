@@ -37,7 +37,7 @@ function decide(input) {
 // Marker for "this agent was already sent back once". Returns true when it was created now (first block), false when it
 // already existed or cannot be told (then the worker passes). No key in the input means no block.
 function claimBlock(input, dir) {
-  const id = input.agent_id || input.agent_transcript_path || input.session_id;
+  const id = input.agent_id || input.agent_transcript_path;
   if (typeof id !== 'string' || !id) return false;
   try {
     const name = 'haku-worker-stop-' + crypto.createHash('sha256').update(id).digest('hex').slice(0, 32);
