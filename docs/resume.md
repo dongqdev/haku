@@ -7,6 +7,18 @@ worktrees. The way to continue is an event that starts a fresh session, which re
 haku does not create any trigger for you, and no haku code does. You set it up by hand; this page is the recipe.
 Sources: code.claude.com/docs/en/routines.md, github-actions.md, scheduled-tasks.md, goal.md.
 
+## Which official feature keeps the agent going
+
+| Feature | Runs where | Keeps going until | Survives the session ending | Use it for |
+|---|---|---|---|---|
+| `/goal` | the open session (a Stop hook; a judge reads only the conversation) | the end state is shown in the conversation, or the turn cap | restored when the session is resumed | one run that must not stop early (see "Goal for one session" in `skills/build/SKILL.md`) |
+| `/loop` (`ScheduleWakeup`) | the open session | you stop it; expires after 7 days | no; a self-paced loop is not restored on resume | waiting or checking inside one session |
+| Scheduled tasks / routines (cloud) | a new cloud session per run | one run per trigger (schedule, API or GitHub event); at least 1 hour between scheduled runs | yes, each run starts fresh | bringing a story back after the session ended (sections 1 and 2 below) |
+
+haku adds no restart loop and no "no progress" hook of its own: the three above cover the cases, and the unattended
+safety rails are the turn cap in `/goal` and the gates that never open by themselves. The facts in this table come from
+code.claude.com/docs (goal, scheduled-tasks, routines) as read on 2026-11-02, partly second-hand; check them before relying on a limit.
+
 ## What the resumed run does and never does
 
 - It reads the story's issue state (`issues.js status`, `worker-list`, `pr-state`) and continues the loop of
@@ -63,3 +75,8 @@ GitHub Actions(`anthropics/claude-code-action@v1`)이고, `/loop`는 세션이 �
 제약: 이벤트마다 새 세션이라 상태를 이슈·PR 댓글에 남겨야 하고, routine은 연구 미리보기이며 시간당 실행 한도가
 있습니다. 재개된 실행은 병합하지 않으며 승인 게이트(병합 승인, 결정 질문, T3 판정, `--user-approved`)를 대신 답하지
 않습니다. haku는 트리거를 만들어 주지 않고 문서만 제공합니다.
+
+공식 기능 비교(위 표): `/goal`은 열린 세션에서 종료 상태가 대화에 나타날 때까지(턴 상한 포함, 재개 시 복원), `/loop`는 열린
+세션 안의 주기 확인(7일 만료, 재개 시 복원 안 됨), 예약 작업/routine은 이벤트마다 새 세션(스케줄 최소 1시간). haku는
+자체 재시작 루프나 진전 없음 감지 훅을 만들지 않고, 무인 실행 안전장치는 `/goal`의 턴 상한과 스스로 열리지 않는 승인
+게이트입니다.

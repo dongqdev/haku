@@ -17,3 +17,12 @@ test('resume.md leads with events, names the constraints and never allows mergin
     assert.match(t, re, String(re));
   assert.doesNotMatch(t, /--admin|--force|auto-merge|merge on its own\b(?!.*never)/i);
 });
+
+test('build goal condition has an end state, evidence and a turn cap; resume.md compares the official features', () => {
+  const b = read('skills/build/SKILL.md');
+  assert.match(b, /\/goal "<end state>, shown by <printed evidence>, or stop after N turns"/);
+  assert.match(b, /waiting on the user/);
+  const r = read('docs/resume.md');
+  for (const re of [/## Which official feature keeps the agent going/, /\| `\/goal` \|/, /\| `\/loop`/, /Scheduled tasks/])
+    assert.match(r, re, String(re));
+});
