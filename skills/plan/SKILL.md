@@ -35,6 +35,8 @@ If a goal summary's 열린 질문 section still holds a `[확인 필요]` marker
 
 If the goal touches a platform feature (Claude Code, plugins, hooks, skills), have the read-only `researcher` check the official docs for an existing feature before designing your own, and record the finding (found / not found / could not check) in one line of the draft body or assumptions.
 
+**A negative claim about an outside service or API is not a fact until it is checked.** If the goal, the issue it came from, a handoff or your own draft says a third-party service, API or library "has no X", "cannot do X" or "does not support X" (an endpoint, a field, a feature), and it names no source address and no range that was read, do not carry it into the draft as a fact. Either mark it `[확인 필요]` or have the read-only `researcher` check it once, and record one line in the draft body or assumptions: found / not found / could not check, with the source address and what part of the document was read (whole or partial). A claim that something is missing is proven only by reading the whole specification; "not in the list I read" is an absence of evidence, so write "could not check" and mark it. Do the same for the premise of any choice question you are about to ask: if it rests on such a claim, check it before asking.
+
 ## 2. Draft
 
 Write the draft to `.haku/drafts/<slug>.json` (local only):
