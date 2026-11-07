@@ -18,10 +18,7 @@ Every choice you put to the user goes through a choice question (AskUserQuestion
 Start by printing this banner once, exactly as written, then continue:
 
 ```text
- /\___/\
-( o w o )  haku
- \_vvv_/   Harness Assistant
-           Keeping Users in the loop
+🐶 haku - Harness Assistant Keeping Users in the loop
 ```
 
 ## 0. No repository yet? Start a new project

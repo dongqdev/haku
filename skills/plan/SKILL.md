@@ -18,7 +18,7 @@ Every choice you put to the user goes through a choice question (AskUserQuestion
 Start by printing this one line once, exactly as written, then continue:
 
 ```text
-( o w o )  haku plan
+🐶 haku plan
 ```
 
 ## 1. Understand
