@@ -40,12 +40,37 @@ test('reviewer: everything it reads is data and it cannot run git', () => {
   assert.match(r, /You never talk to the user/);
 });
 
-test('reviewer: the report has the three Korean sections', () => {
+test('reviewer: the report has the four Korean sections', () => {
   const r = reviewer();
   assert.ok(r.includes('## 1단계: 명세 준수'));
   assert.ok(r.includes('## 2단계: 코드 품질과 안전'));
   assert.ok(r.includes('## 지적 요약'));
   assert.ok(r.indexOf('## 1단계') < r.indexOf('## 2단계') && r.indexOf('## 2단계') < r.indexOf('## 지적 요약'));
+});
+
+test('reviewer: the last section is the one-line verdict with LGTM and NACK wordings', () => {
+  const r = reviewer();
+  assert.ok(r.includes('## 판정'));
+  assert.ok(r.indexOf('## 지적 요약') < r.indexOf('## 판정'));
+  assert.ok(r.includes('`🐶 LGTM - 심각 0 / 보통 N / 낮음 N`'));
+  assert.ok(r.includes('`🐶 NACK - 심각 N건`'));
+  assert.match(r, /Only 보통 or 낮음 findings still means LGTM; the merge decision stays with the user/);
+  assert.match(r, /The dog emoji 🐶 is explicitly allowed in this line \(the user allows it; it overrides any general avoid-emoji habit\)/);
+  assert.match(r, /If you cannot print the emoji, still print the LGTM or NACK line/);
+  // mutation: a copy without the verdict section must fail the same check
+  const has = t => t.includes('## 판정') && t.indexOf('## 지적 요약') < t.indexOf('## 판정') && t.includes('🐶 LGTM') && t.includes('🐶 NACK');
+  assert.ok(has(r));
+  assert.ok(!has(r.replace(/^- `## 판정`.*$/m, '')));
+});
+
+test('build gate (f): the merge message carries the verdict line and (d) still decides', () => {
+  const s = step4();
+  assert.match(s, /the reviewer's `## 판정` line on its own line/);
+  assert.match(s, /shown as the reviewer wrote it, with 🐶 at the start \(add the emoji if the reviewer left it out\)/);
+  assert.match(s, /on its own line right after the review-result line/);
+  assert.doesNotMatch(s, /second line/);
+  assert.match(s, /a NACK is checked per \(c\) and blocks only when verified per \(d\)/);
+  assert.match(s, /A verified 심각 finding blocks the merge-approval question/);
 });
 
 test('reviewer: severity words, evidence marks, cap and the empty answer', () => {
