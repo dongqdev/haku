@@ -83,8 +83,8 @@ test('the worker prints a one-line PR banner', () => {
   assert.ok(!worker.includes('( o w o )'));
 });
 
-test('no old ASCII face is left in setup or the worker', () => {
-  for (const f of ['skills/setup/SKILL.md', 'agents/worker.md']) {
+test('no ASCII face is left in plan, build, setup or the worker', () => {
+  for (const f of ['skills/plan/SKILL.md', 'skills/build/SKILL.md', 'skills/setup/SKILL.md', 'agents/worker.md']) {
     assert.ok(!fs.readFileSync(path.join(__dirname, '..', f), 'utf8').includes('( o w o )'), f);
   }
 });
