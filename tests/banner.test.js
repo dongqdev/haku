@@ -5,7 +5,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
-// The banner is one plain line (no ASCII art, which breaks in the phone app: whitespace collapses and backslashes vanish).
+// The setup banner is one plain line; plan and build print dog art, but only inside a code block (outside one the phone app collapses whitespace and drops backslashes).
 // A plain line may wrap on a phone without harm, but keep it short. Emoji count as 2 columns.
 const MAX_COLUMNS = 56;
 const skill = fs.readFileSync(path.join(__dirname, '..', 'skills', 'setup', 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
@@ -30,13 +30,51 @@ test('no ASCII-art face remains in the banner', () => {
   assert.doesNotMatch(text, /[\\\/_]{2,}|vvv|\( o/);
 });
 
-test('plan and build print a one-line mini banner that fits the column limit', () => {
-  for (const name of ['plan', 'build']) {
-    const text = fs.readFileSync(path.join(__dirname, '..', 'skills', name, 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
-    const m = text.match(/## Banner[\s\S]*?```text\n([\s\S]*?)```/);
-    assert.ok(m, `${name}: banner block missing`);
-    assert.strictEqual(m[1], `🐶 haku ${name}\n`);
+const ART = [
+  '                 ________________',
+  '                |                |_____    __',
+  '                |@@@@@@@@@@@@@@@@|     |__|  |_________',
+  '                |________________|     |::|  |        /',
+  '   /\\**/\\       |                \\.____|::|__|      <',
+  '  ( o_o  )_     |                      \\::/  \\._______\\',
+  '   (u--u   \\_)  |',
+  '    (||___   )==\\',
+  '  ,dP"/b/=( /P"/b\\',
+  '  |8 || 8\\=== || 8',
+  '  `b,  ,P  `b,  ,P',
+  '    """`     """`',
+];
+const artFor = text => ART.map(l => l.replace('@@@@@@@@@@@@@@@@', text)).join('\n') + '\n';
+const SENTENCE = 'inside the code block';
+const skillText = name => fs.readFileSync(path.join(__dirname, '..', 'skills', name, 'SKILL.md'), 'utf8').replace(/\r\n/g, '\n');
+const bannerProblems = (text, bubble) => {
+  const problems = [];
+  const sec = text.match(/## Banner\n([\s\S]*?)(?=\n## )/);
+  if (!sec) return ['banner section missing'];
+  const m = sec[1].match(/```text\n([\s\S]*?)```/);
+  if (!m) return ['no text code block in the Banner section'];
+  if (m[1] !== artFor(bubble)) problems.push('art differs from the template');
+  if (m[1].split('\n').filter(Boolean).length !== 12) problems.push('not 12 lines');
+  if (!sec[1].includes(SENTENCE)) problems.push('sentence about the code block missing');
+  if (sec[1].includes('&lt;')) problems.push('&lt;');
+  return problems;
+};
+
+test('plan and build print the 12-line dog art in a code block with the right bubble text', () => {
+  for (const [name, bubble] of [['plan', '   START PLAN   '], ['build', '  BUILD START   ']]) {
+    assert.strictEqual(bubble.length, 16);
+    assert.deepStrictEqual(bannerProblems(skillText(name), bubble), [], name);
+    const line = artFor(bubble).split('\n')[2];
+    assert.strictEqual(line.slice(16).split('|')[1].length, 16);
   }
+});
+
+test('mutation: a plan skill without the code fence fails the banner check', () => {
+  const text = skillText('plan');
+  const broken = text.replace(/## Banner\n([\s\S]*?)```text\n/, '## Banner\n$1').replace(/(## Banner\n[\s\S]*?)```\n/, '$1');
+  assert.notStrictEqual(broken, text);
+  assert.ok(bannerProblems(broken, '   START PLAN   ').length > 0);
+  assert.ok(bannerProblems(text.replace(SENTENCE, 'somewhere'), '   START PLAN   ').length > 0);
 });
 
 test('the worker prints a one-line PR banner', () => {
