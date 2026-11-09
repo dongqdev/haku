@@ -73,6 +73,15 @@ test('build gate (f): the merge message carries the verdict line and (d) still d
   assert.match(s, /A verified 심각 finding blocks the merge-approval question/);
 });
 
+test('build: verdict and merge arts are named in (f) and step (6) and exist in code blocks', () => {
+  const s = step4();
+  assert.match(s, /the LGTM!!! art when the reviewer's 심각 count is 0, the NACK art when it is 1 or more/);
+  assert.match(s, /still show the reviewer's art and explain in words/);
+  const b = read('skills/build/SKILL.md');
+  assert.match(b.match(/^6\. \*\*After the merge:\*\*[\s\S]*?(?=^7\. )/m)[0], /MERGED! art[^\n]*once in a code block/);
+  for (const w of ['LGTM!!!', 'NACK', 'MERGED!']) assert.match(b, new RegExp('```text\\n(?:[^`]*\\n)?[^\\n]*\\|[^\\n|]*' + w + '[^\\n|]*\\|'), w);
+});
+
 test('reviewer: severity words, evidence marks, cap and the empty answer', () => {
   const r = reviewer();
   for (const w of ['심각', '보통', '낮음', '사실', '추정']) assert.ok(r.includes(w), w);

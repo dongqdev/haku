@@ -15,11 +15,24 @@ Every choice you put to the user goes through a choice question (AskUserQuestion
 
 ## Banner
 
-Start by printing this one line once, exactly as written, then continue:
+Print the art once, exactly as written and inside the code block (outside a code block the app collapses the spaces and drops the backslashes):
 
 ```text
-🐶 haku plan
+                 ________________
+                |                |_____    __
+                |   START PLAN   |     |__|  |_________
+                |________________|     |::|  |        /
+   /\**/\       |                \.____|::|__|      <
+  ( o_o  )_     |                      \::/  \._______\
+   (u--u   \_)  |
+    (||___   )==\
+  ,dP"/b/=( /P"/b\
+  |8 || 8\=== || 8
+  `b,  ,P  `b,  ,P
+    """`     """`
 ```
+
+Then continue.
 
 ## 1. Understand
 
