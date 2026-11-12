@@ -121,3 +121,102 @@ test('structure check catches a missing legs line', () => {
   const broken = good.split('\n').filter((l) => !l.includes('(||___')).join('\n');
   assert.ok(structureProblems(broken, 'A').length > 0);
 });
+
+const DOG_BODY = [
+  '   /\\**/\\       |',
+  '  ( o_o  )_     |',
+  '   (u--u   \\_)  |',
+  '    (||___   )==\\',
+  '  ,dP"/b/=( /P"/b\\',
+  '  |8 || 8\\=== || 8',
+  '  `b,  ,P  `b,  ,P',
+  '    """`     """`',
+];
+const DOG_PLAIN = [
+  '   /\\**/\\',
+  '  ( o_o  )_',
+  '   (u--u   \\_)',
+  '    (||___   )==\\',
+  '  ,dP"/b/=( /P"/b\\',
+  '  |8 || 8\\=== || 8',
+  '  `b,  ,P  `b,  ,P',
+  '    """`     """`',
+];
+
+const GOLDEN = [
+  ['A LGTM!!!', 'LGTM!!!', 'A', [
+    '                 ________________',
+    '                |                |',
+    '                |    LGTM!!!     |',
+    '                |________________|',
+  ].concat(DOG_BODY)],
+  ['B LGTM!!!', 'LGTM!!!', 'B', [
+    '                 ____________',
+    '                |            |',
+    '                |  LGTM!!!   |',
+    '                |____________|',
+  ].concat(DOG_BODY)],
+  ['C LGTM!!!', 'LGTM!!!', 'C', [
+    '   ____________',
+    '  |            |',
+    '  |  LGTM!!!   |',
+    '  |____    ____|',
+    '       \\  /',
+  ].concat(DOG_PLAIN)],
+  ['D narrow LGTM!!!', 'LGTM!!!', 'D', [
+    '∧＿∧  ＜ LGTM!!!',
+    '(≧∀≦）/|',
+    'と　と　ヽﾉ',
+    ' ヽ　､　　)',
+    '　　>_/>_/',
+  ]],
+  ['D wide SNIFF', 'SNIFF', 'D', [
+    '∧＿＿∧  ＜ SNIFF',
+    '(´･ω･｀）/|',
+    'と　と　　ヽﾉ',
+    ' ヽ　､　　　)',
+    '　　>_/>_/',
+  ]],
+  ['E narrow NACK', 'NACK', 'E', [
+    '∧＿∧  ＜ NACK',
+    '(；´Д｀） /|',
+    '|　 r- V ﾉ',
+    'しゝしゝ_)',
+  ]],
+  ['E wide START PLAN', 'START PLAN', 'E', [
+    '∧＿＿∧  ＜ START PLAN',
+    '(｀･ω･´） /|',
+    '|　 r- V ﾉ',
+    'しゝしゝ_)',
+  ]],
+].map(([name, label, shape, lines]) => ({ name, label, shape, text: lines.join('\n') + '\n' }));
+
+// Returns a list of problems found when comparing art with its golden text.
+function goldenProblems(text, golden) {
+  return text === golden ? [] : ['differs from golden'];
+}
+
+for (const g of GOLDEN) {
+  test('golden ' + g.name, () => {
+    assert.strictEqual(render(g.label, g.shape), g.text);
+  });
+}
+
+test('golden check catches character-level changes that keep the line count', () => {
+  const a = GOLDEN[0];
+  assert.deepStrictEqual(goldenProblems(render(a.label, a.shape), a.text), []);
+  const brokenA = a.text.replace('"/b\\\n', '"/b/\n');
+  assert.notStrictEqual(brokenA, a.text);
+  assert.strictEqual(brokenA.split('\n').length, a.text.split('\n').length);
+  assert.ok(goldenProblems(brokenA, a.text).length > 0);
+
+  const d = GOLDEN.find((g) => g.name === 'D wide SNIFF');
+  const brokenD = d.text.replace('と　と　　ヽﾉ', 'と　と　ヽﾉ');
+  assert.notStrictEqual(brokenD, d.text);
+  assert.ok(goldenProblems(brokenD, d.text).length > 0);
+});
+
+test('pick order', () => {
+  ['A', 'B', 'C', 'D', 'E'].forEach((s, i) => assert.strictEqual(pick(i), s));
+  assert.strictEqual(pick(5), 'A');
+});
