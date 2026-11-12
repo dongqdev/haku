@@ -15,11 +15,9 @@ Every choice you put to the user goes through a choice question (AskUserQuestion
 
 ## Banner
 
-Start by printing this banner once, exactly as written, then continue:
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "SETUP"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku setup` instead and carry on.
 
-```text
-🐶 haku - Harness Assistant Keeping Users in the loop
-```
+In setup, after the art also print the plain line `🐶 haku - Harness Assistant Keeping Users in the loop`.
 
 ## 0. No repository yet? Start a new project
 

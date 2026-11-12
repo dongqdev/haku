@@ -13,6 +13,10 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Every choice you put to the user goes through a choice question (AskUserQuestion), never free text, and a risky branch is never settled by assuming. Recommended option first, literal UTF-8, no prose questions at reply end, never postpone. Read the full rule in the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md` before the first question; it applies here unchanged.
 
+## Banner
+
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "RETRO"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku retro` instead and carry on.
+
 ## 1. Gather
 
 A retro is about ONE story. `/haku:retro` takes the story number N (and the repository the story lives in); Gather reads the closed children (tasks and milestones) of that story. When it is started by hand without a number, ask with a choice question which closed story from `issues.js retro-due` it is for, with a last option "none: a general retro without a marker" (then step 4 does not run `retro-done`).

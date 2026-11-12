@@ -15,24 +15,7 @@ Every choice you put to the user goes through a choice question (AskUserQuestion
 
 ## Banner
 
-Print the art once, exactly as written and inside the code block (outside a code block the app collapses the spaces and drops the backslashes):
-
-```text
-                 ________________
-                |                |_____    __
-                |   START PLAN   |     |__|  |_________
-                |________________|     |::|  |        /
-   /\**/\       |                \.____|::|__|      <
-  ( o_o  )_     |                      \::/  \._______\
-   (u--u   \_)  |
-    (||___   )==\
-  ,dP"/b/=( /P"/b\
-  |8 || 8\=== || 8
-  `b,  ,P  `b,  ,P
-    """`     """`
-```
-
-Then continue.
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "START PLAN"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku plan` instead and carry on.
 
 ## 1. Understand
 

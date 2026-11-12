@@ -13,6 +13,10 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Every choice you put to the user goes through a choice question (AskUserQuestion), and a risky branch is never settled by assuming. The full rule is the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md`.
 
+## Banner
+
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "STATUS"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku status` instead and carry on.
+
 ## Procedure
 
 1. Run `issues.js status` and show its output as is. It prints five fixed sections, always in this order: 스토리 진행, 지금 시작할 수 있음, 막힘, 진행 중(워커), 마감 미완. An empty section says "(없음)", so a missing section means the output was cut off, not that nothing is there.

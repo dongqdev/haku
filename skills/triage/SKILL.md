@@ -13,6 +13,10 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Every choice you put to the user goes through a choice question (AskUserQuestion), and a risky branch is never settled by assuming. The full rule is the `## Decisions` section of `${CLAUDE_PLUGIN_ROOT}/skills/sniff/SKILL.md`.
 
+## Banner
+
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "TRIAGE"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku triage` instead and carry on.
+
 ## Procedure
 
 1. Run `issues.js triage` and show its two sections: open issues that belong to no story, and duplicate candidates. Duplicates are only issues with the same title or the same opening sentence; nothing fuzzier is proposed.

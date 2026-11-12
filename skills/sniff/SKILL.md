@@ -13,6 +13,10 @@ Helper: `node "${CLAUDE_PLUGIN_ROOT}/scripts/issues.js"` (called `issues.js`).
 
 Ask the user to decide only through a choice question (AskUserQuestion), never in free text: recommended option first and marked "(Recommended)", question text as literal UTF-8 (no `\uXXXX` escapes). Only the orchestrator talks to the user; a worker sends its decision request to the orchestrator. Any sentence that asks the user to answer or choose is a decision, small and procedural ones too. Before ending a reply, read its last paragraph; if it asks in prose, turn it into a choice question. Never postpone a question, and if the tool call is declined, ask again, shorter. A step the user already instructed needs no question.
 
+## Banner
+
+At the start, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/banner.js" "SNIFF"` once and print its output exactly as it is, inside a ```text code block, keeping the leading spaces (outside a code block the app collapses spaces and drops backslashes, so never print it as plain text). If the command fails, print the one line `🐶 haku sniff` instead and carry on.
+
 ## 1. Find the facts yourself
 
 Facts are your job, never the user's. Read what can answer a question: the repository (README, layout, manifests), `.haku/config.json` and the open issues (`issues.js status`, `issues.js triage`). Never ask the user something the code or the issues already answer; say what you found instead. When a fact needs a bigger search (many files, another folder) hand it to a read-only exploration subagent; when it lives on the web (a service's API, a limit, a price), ask the `haku:researcher` agent one narrow question and put the excerpts it needs into its brief, with nothing secret in them. When the goal touches a platform feature (Claude Code, plugins, hooks, skills), check the official docs for an existing feature first, through the `haku:researcher` agent, and write the finding (found / not found / could not check) as one line in the summary's assumptions. Do not wait for a search to finish before asking the other questions: only the questions that depend on its answer wait.
