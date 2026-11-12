@@ -73,54 +73,37 @@ test('build gate (f): the merge message carries the verdict line and (d) still d
   assert.match(s, /A verified 심각 finding blocks the merge-approval question/);
 });
 
-const ART = [
-  '                 ________________',
-  '                |                |_____    __',
-  '                |@@@@@@@@@@@@@@@@|     |__|  |_________',
-  '                |________________|     |::|  |        /',
-  '   /\\**/\\       |                \\.____|::|__|      <',
-  '  ( o_o  )_     |                      \\::/  \\._______\\',
-  '   (u--u   \\_)  |',
-  '    (||___   )==\\',
-  '  ,dP"/b/=( /P"/b\\',
-  '  |8 || 8\\=== || 8',
-  '  `b,  ,P  `b,  ,P',
-  '    """`     """`',
-];
-const artFor = t => ART.map(l => l.replace('@@@@@@@@@@@@@@@@', t)).join('\n') + '\n';
-const BUBBLES = { 'LGTM!!!': '     LGTM!!!    ', NACK: '      NACK      ', 'MERGED!': '    MERGED!     ' };
-// returns a list of problems with the three arts of the "Verdict and merge art" section
-const artProblems = text => {
-  const sec = text.match(/^## Verdict and merge art\n([\s\S]*?)(?=^## )/m);
-  if (!sec) return ['section missing'];
+// returns a list of problems with the banner.js wording in (f) and step (6) of a build skill text
+const gateProblems = build => {
   const problems = [];
-  if (sec[1].includes('&lt;')) problems.push('&lt;');
-  for (const [name, bubble] of Object.entries(BUBBLES)) {
-    if (bubble.length !== 16) problems.push(name + ': bubble width');
-    const m = sec[1].match(new RegExp('^' + name.replace(/[!]/g, '\\$&') + ':\\n\\n```text\\n([\\s\\S]*?)```', 'm'));
-    if (!m) { problems.push(name + ': block missing'); continue; }
-    if (m[1] !== artFor(bubble)) problems.push(name + ': art differs from the template');
-  }
+  const m4 = build.match(/^4\. \*\*Verify by tier\*\*[\s\S]*?(?=^5\. )/m);
+  const m6 = build.match(/^6\. \*\*After the merge:\*\*[\s\S]*?(?=^7\. )/m);
+  if (!m4 || !m6) return ['step 4 or 6 missing'];
+  const s = m4[0];
+  if (!/scripts\/banner\.js" "LGTM!!!"`[^\n]*when the reviewer's 심각 count is 0/.test(s)) problems.push('(f) LGTM!!! call');
+  if (!/scripts\/banner\.js" "NACK"`[^\n]*when it is 1 or more/.test(s)) problems.push('(f) NACK call');
+  if (!/still show the reviewer's art and explain in words/.test(s)) problems.push('(f) disagree rule');
+  if (!/exactly as it is inside a ```text code block, keeping the leading spaces, never as plain text; if banner\.js fails, show nothing for the art and still show the verdict line/.test(s)) problems.push('(f) code block and failure wording');
+  if (!(s.indexOf('Right above the verdict line show the verdict art') > s.indexOf('the review-result line'))) problems.push('(f) art above verdict');
+  if (!(s.indexOf('the art, the verdict line') > s.indexOf('which comes after the review-result line'))) problems.push('(f) order');
+  if (!/banner\.js" "MERGED!"`[^\n]*once, printed exactly as it is inside a ```text code block, keeping the leading spaces, never as plain text; if banner\.js fails, skip the art/.test(m6[0])) problems.push('(6) MERGED call');
+  if (/as the first line show/.test(m6[0]) || !/first, show the output/.test(m6[0])) problems.push('(6) first wording');
+  if (build.includes('## Verdict and merge art')) problems.push('old section present');
   return problems;
 };
 
-test('build: verdict and merge arts are exact, named in (f) and step (6), and (f) puts the art above the verdict line', () => {
-  const s = step4();
-  assert.match(s, /the LGTM!!! art when the reviewer's 심각 count is 0, the NACK art when it is 1 or more/);
-  assert.match(s, /still show the reviewer's art and explain in words/);
-  assert.ok(s.indexOf('Right above the verdict line show the verdict art') > s.indexOf('the review-result line'));
-  assert.ok(s.indexOf('the art, the verdict line') > s.indexOf('which comes after the review-result line'));
-  const b = read('skills/build/SKILL.md');
-  assert.match(b.match(/^6\. \*\*After the merge:\*\*[\s\S]*?(?=^7\. )/m)[0], /MERGED! art[^\n]*once in a code block/);
-  assert.deepStrictEqual(artProblems(b), []);
+test('build: verdict and merge arts come from banner.js, named in (f) and step (6), and (f) puts the art above the verdict line', () => {
+  assert.deepStrictEqual(gateProblems(read('skills/build/SKILL.md')), []);
 });
 
-test('mutation: a missing art line or a changed bubble width fails the art check', () => {
+test('mutation: (f) or (6) with another word after banner.js fails the check', () => {
   const b = read('skills/build/SKILL.md');
-  assert.ok(artProblems(b.replaceAll('    (||___   )==\\\n', '')).length > 0);
-  assert.ok(artProblems(b.replace('|     LGTM!!!    |', '|     LGTM!!!   |')).length > 0);
-  assert.ok(artProblems(b.replace('|      NACK      |', '|      NACK       |')).length > 0);
-  assert.ok(artProblems(b.replace(/(## Verdict and merge art[\s\S]*?)```text\n( {17}____)/, '$1$2')).length > 0);
+  for (const w of ['NACK', 'LGTM!!!', 'MERGED!']) {
+    const broken = b.replace('banner.js" "' + w + '"', 'banner.js" "X"');
+    assert.notStrictEqual(broken, b, w);
+    assert.ok(gateProblems(broken).length > 0, w);
+  }
+  assert.ok(gateProblems(b.replace('if banner.js fails, show nothing for the art', '')).length > 0);
 });
 
 test('reviewer: severity words, evidence marks, cap and the empty answer', () => {
