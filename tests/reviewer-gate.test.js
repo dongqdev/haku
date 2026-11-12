@@ -73,22 +73,37 @@ test('build gate (f): the merge message carries the verdict line and (d) still d
   assert.match(s, /A verified 심각 finding blocks the merge-approval question/);
 });
 
+// returns a list of problems with the banner.js wording in (f) and step (6) of a build skill text
+const gateProblems = build => {
+  const problems = [];
+  const m4 = build.match(/^4\. \*\*Verify by tier\*\*[\s\S]*?(?=^5\. )/m);
+  const m6 = build.match(/^6\. \*\*After the merge:\*\*[\s\S]*?(?=^7\. )/m);
+  if (!m4 || !m6) return ['step 4 or 6 missing'];
+  const s = m4[0];
+  if (!/scripts\/banner\.js" "LGTM!!!"`[^\n]*when the reviewer's 심각 count is 0/.test(s)) problems.push('(f) LGTM!!! call');
+  if (!/scripts\/banner\.js" "NACK"`[^\n]*when it is 1 or more/.test(s)) problems.push('(f) NACK call');
+  if (!/still show the reviewer's art and explain in words/.test(s)) problems.push('(f) disagree rule');
+  if (!/exactly as it is inside a ```text code block, keeping the leading spaces, never as plain text; if banner\.js fails, show nothing for the art and still show the verdict line/.test(s)) problems.push('(f) code block and failure wording');
+  if (!(s.indexOf('Right above the verdict line show the verdict art') > s.indexOf('the review-result line'))) problems.push('(f) art above verdict');
+  if (!(s.indexOf('the art, the verdict line') > s.indexOf('which comes after the review-result line'))) problems.push('(f) order');
+  if (!/banner\.js" "MERGED!"`[^\n]*once, printed exactly as it is inside a ```text code block, keeping the leading spaces, never as plain text; if banner\.js fails, skip the art/.test(m6[0])) problems.push('(6) MERGED call');
+  if (/as the first line show/.test(m6[0]) || !/first, show the output/.test(m6[0])) problems.push('(6) first wording');
+  if (build.includes('## Verdict and merge art')) problems.push('old section present');
+  return problems;
+};
+
 test('build: verdict and merge arts come from banner.js, named in (f) and step (6), and (f) puts the art above the verdict line', () => {
-  const s = step4();
-  assert.match(s, /scripts\/banner\.js" "LGTM!!!"`[^\n]*when the reviewer's 심각 count is 0/);
-  assert.match(s, /scripts\/banner\.js" "NACK"`[^\n]*when it is 1 or more/);
-  assert.match(s, /still show the reviewer's art and explain in words/);
-  assert.ok(s.indexOf('Right above the verdict line show the verdict art') > s.indexOf('the review-result line'));
-  assert.ok(s.indexOf('the art, the verdict line') > s.indexOf('which comes after the review-result line'));
-  const b = read('skills/build/SKILL.md');
-  assert.match(b.match(/^6\. \*\*After the merge:\*\*[\s\S]*?(?=^7\. )/m)[0], /banner\.js" "MERGED!"`[^\n]*once in a code block/);
-  assert.ok(!b.includes('## Verdict and merge art'));
+  assert.deepStrictEqual(gateProblems(read('skills/build/SKILL.md')), []);
 });
 
-test('mutation: a (f) without the NACK banner call fails the check', () => {
-  const s = step4();
-  assert.ok(s.includes('banner.js" "NACK"'));
-  assert.ok(!s.replace('banner.js" "NACK"', 'banner.js" "X"').includes('banner.js" "NACK"'));
+test('mutation: (f) or (6) with another word after banner.js fails the check', () => {
+  const b = read('skills/build/SKILL.md');
+  for (const w of ['NACK', 'LGTM!!!', 'MERGED!']) {
+    const broken = b.replace('banner.js" "' + w + '"', 'banner.js" "X"');
+    assert.notStrictEqual(broken, b, w);
+    assert.ok(gateProblems(broken).length > 0, w);
+  }
+  assert.ok(gateProblems(b.replace('if banner.js fails, show nothing for the art', '')).length > 0);
 });
 
 test('reviewer: severity words, evidence marks, cap and the empty answer', () => {

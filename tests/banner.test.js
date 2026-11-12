@@ -19,11 +19,29 @@ const bannerProblems = (text, name) => {
   if (!sec[1].includes(SENTENCE)) problems.push('sentence about the code block missing');
   if (!sec[1].includes('`🐶 haku ' + name + '`')) problems.push('fallback line missing');
   if (name === 'setup' && !sec[1].includes(TAGLINE)) problems.push('tagline missing');
+  if (name === 'setup' && !sec[1].includes('always print the plain line ' + TAGLINE + ' after the art, or after the fallback line when banner.js failed')) problems.push('tagline sentence missing');
   return problems;
 };
 
 test('all seven skills have a Banner section that runs banner.js with the right label', () => {
   for (const name of Object.keys(LABELS)) assert.deepStrictEqual(bannerProblems(skillText(name), name), [], name);
+});
+
+// A plain line may wrap on a phone without harm, but keep it short. Emoji count as 2 columns.
+const MAX_COLUMNS = 56;
+const columns = line => [...line].reduce((n, ch) => n + (ch.codePointAt(0) > 0xFFFF ? 2 : 1), 0);
+
+test(`the setup tagline line fits ${MAX_COLUMNS} columns (emoji count 2)`, () => {
+  const line = TAGLINE.replaceAll('`', '');
+  assert.ok(skillText('setup').includes(line));
+  assert.ok(columns(line) <= MAX_COLUMNS, columns(line) + ' columns');
+});
+
+test('mutation: a setup skill without the tagline sentence fails the banner check', () => {
+  const text = skillText('setup');
+  const broken = text.replace('always print the plain line', 'print the plain line');
+  assert.notStrictEqual(broken, text);
+  assert.ok(bannerProblems(broken, 'setup').length > 0);
 });
 
 test('the Banner section sits before the first numbered or procedure step', () => {
